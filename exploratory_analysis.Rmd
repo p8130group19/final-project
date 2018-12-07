@@ -1,0 +1,26 @@
+---
+title: "P8130 Final Project, Exploratory Analyses"
+author: "James Dalgleish"
+date: "December 7, 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, cache = T)
+library(tidyverse)
+library(glmnet)
+```
+```{r data_import}
+can_reg <- data.table::fread("Cancer_Registry.csv") 
+  
+#this is the same file, but the n in Dona ana county has been changed to remove the n~ and allow processing.
+can_reg %>% skimr::skim()
+```
+We'll find that several variables have a great deal of missing data. In particular PctSomeCol18_24, PctPublicCoverage, PctEmployed16_Over, PctPrivateCoverageAlone all have missing data, which will decrease our sample size by 161 at minimum (columns 18, 22, 25, 27 of the original dataset).
+Column 9 (binnedInc) is a factor, as is column 13 (county). Pct unemployed presents similar information to the percent employed, so we could choose to include the percent employed rather than the unemployed percetange.
+```{r lasso}
+can_reg_lasso <- glmnet(x = as.matrix(can_reg[,c(1,2,4:8,11:12,14:17,19:21,23:24,26:34)]),y = can_reg$TARGET_deathRate, alpha = 1)
+#can_reg[,1]
+
+```
+

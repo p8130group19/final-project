@@ -14,6 +14,10 @@ library(glmnet)
 can_reg <- data.table::fread("Cancer_Registry.csv") 
   
 #this is the same file, but the n in Dona ana county has been changed to remove the n~ and allow processing.
+skimr::skim_with(numeric = list(hist = NULL,min = min,max = max,kurtosis = e1071::kurtosis,skewness = e1071::skewness,IQR = IQR,
+                                mean = mean,
+                                cv = function(x){sd(x)/mean(x)}))
+
 can_reg %>% skimr::skim()
 ```
 We'll find that several variables have a great deal of missing data. In particular PctSomeCol18_24, PctPublicCoverage, PctEmployed16_Over, PctPrivateCoverageAlone all have missing data, which will decrease our sample size by 161 at minimum (columns 18, 22, 25, 27 of the original dataset).

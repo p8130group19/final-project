@@ -1,0 +1,60 @@
+---
+title: "Exploratory_analysis_insurance"
+author: "Jiayi Shen"
+date: "12/7/2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+```
+
+## Reference to the association between insurance type and cancer mortality
+- [Trends in Cancer Survival by Health Insurance Status in California From 1997 to 2014., 2018](https://www.ncbi.nlm.nih.gov/pubmed/29192307)   
+Relative to privately insured patients, cancer-specific mortality was higher in uninsured patients for all cancers except prostate, and disparities were largest from 2009 to 2014 for breast (HR, 1.72; 95% CI, 1.45-2.03), lung (men: HR, 1.18; 95% CI, 1.06-1.31 and women: HR, 1.32; 95% CI, 1.15-1.50), and colorectal cancer (women: HR, 1.30; 95% CI, 1.05-1.62). Mortality was also higher for patients with other public insurance for all cancers except lung, and disparities were largest from 2009 to 2014 for breast (HR, 1.25; 95% CI, 1.17-1.34), prostate (HR, 1.17; 95% CI, 1.04-1.31), and colorectal cancer (men: HR, 1.16; 95% CI, 1.08-1.23 and women: HR, 1.11; 95% CI, 1.03-1.20).  
+
+- [The Impact of Health Insurance Status on the Survival of Patients With Head and Neck Cancer, published on 2010](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3085979/)
+Patients with Medicaid/uninsured (hazard ratio [HR], 1.50; 95% confidence interval [CI], 1.07-2.11) and Medicare disability (HR, 1.69; 95% CI, 1.16-2.48) had significantly lower overall survival compared with patients with private insurance
+
+- [Factors That Contributed to Black-White Disparities in Survival Among Nonelderly Women With Breast Cancer Between 2004 and 2013, published on 2017](http://ascopubs.org/doi/abs/10.1200/jco.2017.73.7932)
+Matching by insurance explained one third of the excess risk of death;  
+the HR for death in black versus white women is 1.54 (95% CI, 1.47 to 1.62) when matched for insurance.
+
+```{r load data}
+can_reg = read.csv("Cancer_Registry.csv")
+can_reg_insurance = select(can_reg, PctPrivateCoverage:PctPublicCoverageAlone)
+
+#return rows with NAs with respect to insurance variables.
+dim(can_reg_insurance[which(!complete.cases(can_reg_insurance)),])
+```
+
+- 609 missing values in `PctPrivateCoverageAlone`.
+
+## Distribution of variables 
+```{r}
+library(GGally)
+par(mfrow = c(3, 2))
+hist(can_reg$PctPrivateCoverage)
+hist(can_reg$PctPrivateCoverageAlone)
+hist(can_reg$PctEmpPrivCoverage)
+hist(can_reg$PctPublicCoverage)
+hist(can_reg$PctPublicCoverageAlone)
+```
+
+- histograms are pretty much bell-shaped. 
+- more counties with high pct of private coverage, low pct of public coverage. 
+
+
+
+## reference category
+```{r}
+# try make a reference group (i.e. uninsuranced??)
+can_reg_insurance %>% 
+  mutate(no_insurance = 100 - 0.5*(PctPrivateCoverage + PctPrivateCoverageAlone + PctPublicCoverage + PctPublicCoverageAlone)) %>% pull(no_insurance)
+```
+
+Questions:
+- do we need to do stratified analysis?? (by age, gender and other factor of interest)
+
+

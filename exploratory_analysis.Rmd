@@ -5,26 +5,110 @@ date: "December 7, 2018"
 output: html_document
 ---
 
-```{r setup, include=FALSE}
+```{r setup, include=FALSE, fig.height=20, fig.width = 20}
 knitr::opts_chunk$set(echo = TRUE, cache = T)
 library(tidyverse)
 library(glmnet)
 ```
 ```{r data_import}
-can_reg <- data.table::fread("Cancer_Registry.csv") 
+can_reg <- read_csv("Cancer_Registry.csv") 
   
 #this is the same file, but the n in Dona ana county has been changed to remove the n~ and allow processing.
 skimr::skim_with(numeric = list(hist = NULL,min = min,max = max,kurtosis = e1071::kurtosis,skewness = e1071::skewness,IQR = IQR,
                                 mean = mean,
-                                cv = function(x){sd(x)/mean(x)}))
-
+                                cv = function(x){sd(x, na.rm = T)/mean(x, na.rm = T)}
+                                ))
+skimr::skim_with_defaults() #if having trouble with the above, try this or just subset teh columns that you  wish to skim.
 can_reg %>% skimr::skim()
+Amelia::missmap(can_reg)
+can_reg[,c(1,2,4:8,11:12,14:17,19:21,23:24,26:34)] %>% GGally::ggpairs()
+corrplot::corrplot(cor(can_reg[sapply(can_reg,is.numeric)]))
 ```
 We'll find that several variables have a great deal of missing data. In particular PctSomeCol18_24, PctPublicCoverage, PctEmployed16_Over, PctPrivateCoverageAlone all have missing data, which will decrease our sample size by 161 at minimum (columns 18, 22, 25, 27 of the original dataset).
 Column 9 (binnedInc) is a factor, as is column 13 (county). Pct unemployed presents similar information to the percent employed, so we could choose to include the percent employed rather than the unemployed percetange.
 ```{r lasso}
 can_reg_lasso <- glmnet(x = as.matrix(can_reg[,c(1,2,4:8,11:12,14:17,19:21,23:24,26:34)]),y = can_reg$TARGET_deathRate, alpha = 1)
-#can_reg[,1]
+
+```
+
+```{r education}
+education_cols <- can_reg[,c(16:21)]
+skimr::skim_with_defaults()
+education_cols %>% skimr::skim()
+```
+Looking at the skim results, it seems we may want to transform PctBachDeg18_24.
+Despite these varaiables being the most skewed, it seems that the variables having to do with a bachelor's degree tend to be much more correlated with the outcome.
+
+```{r correlations}
+all_pairwise_corr_sorted <- cor(can_reg[sapply(can_reg,is.numeric)]) %>% 
+  reshape2::melt(value.name = "correlation") %>%
+  janitor::clean_names() %>% 
+  filter(var1 != var2) %>% #need to remove duplicate entries of A->B and B->A 
+#  head(10) %>% 
+  arrange(-correlation)
+all_pairwise_corr_sorted
+target_corr <- cor(can_reg[sapply(can_reg,is.numeric)]) %>% 
+  reshape2::melt(value.name = "correlation") %>%
+  janitor::clean_names() %>% 
+  filter(var1 != var2) %>% #need to remove duplicate entries of A->B and B->A 
+#  head(10) %>% 
+  filter(var1 == "TARGET_deathRate") %>% 
+  arrange(-correlation)
+  target_corr
+```
+It seems quite obvious that we should correct for the incidence rate as a potential confounder. The cancer death rate should be obviously influenced by the cancer incidence rate. It would be interesting to see if there are certain subsets of the data where this trend is not so strong (where treatments are better, perhaps).
+
+The type of insurance seems to have a relationship with the death rate, although this may be an indicator of poverty or age/disability status (medicaid is only available to the elderly and disabled, typically).  If we examine this, we may want to include some age variable at the very least.
+
+Poverty tends to have a stronger relationship than income, so this may suggest that binning along important lines can tell us more than simply using a raw continuous variable.
+
+The percentage of those who only attain a high school education at the age of 25 in a given region seems to also be a very important variable, more than other indicators of education.
+
+We may want to see which variables tend to be most correlated with others, with regard to educational status.
+
+A side note about age: A binned age variable could possibly be used, as geriatric communities may have differing levels of income and public health coverage. Age itself might be viewed as a confounder as well.
+
+```{r}
+  target_abs_corr <- cor(can_reg[sapply(can_reg,is.numeric)]) %>% 
+  reshape2::melt(value.name = "correlation") %>%
+  janitor::clean_names() %>% 
+  filter(var1 != var2) %>% #need to remove duplicate entries of A->B and B->A 
+#  head(10) %>% 
+  filter(var1 == "TARGET_deathRate") %>% 
+  mutate(abs_corr = abs(correlation)) %>% 
+  arrange(-abs_corr)
+  target_abs_corr
+
+```
+
+Using the absolute value of correlation, we find that actually the percentage of individuals with a bachelor's degree has an even stronger degree of association with the cancer death rate than even cancer incidence. Pretty profound!
+PctHS25_Over lags behind several other predictors, but still makes the top 10. To avoid multicollinearity, we should probably only choose one variable or at least not all of them.
+The below filtered inter-variable correlations show that indeed this is the case.
+```{r edu_multicollinearity}
+all_pairwise_corr_sorted %>% 
+  filter(var1 %in% names(education_cols))
+```
+
+```{r diagnostics}
+educ<- lm(data = can_reg, as.formula(paste("TARGET_deathRate ~",paste(names(education_cols),collapse=" + "))))
+#str_c(names(education_cols),collapse = "")
+# educ<-lm(data = can_reg, formula =  target_DeathRate ~ PctNoHS18_24 + PctHS18_24 + PctSomeCol18_24 +
+#    PctBachDeg18_24 + PctHS25_Over + PctBachDeg25_Over)
+plot(educ)
+```
+the diagnostics look a bit imperfect. We'll recall that PctBachDeg18_24,  PctBachDeg25_Over, and PctNoHS18_24 were all skewed in distribution. We should apply a boxcox transformation to determine the correct transformations to take for each of these variables.
+```{r transformed_lm_diags_educ}
+educ_log<-lm(data = na.omit(can_reg), formula =  TARGET_deathRate ~ log(PctNoHS18_24 + 1e-2) + PctHS18_24 + PctSomeCol18_24 +
+   log(PctBachDeg18_24 + 1e-2) + PctHS25_Over + log(PctBachDeg25_Over + 1e-2))
+
+plot(educ_log)
+```
+
+```{r aggregate_geography_into_regions}
+
+```
+
+```{r append_incidence_data_following_literature_search}
 
 ```
 

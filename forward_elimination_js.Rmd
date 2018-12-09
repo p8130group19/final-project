@@ -1,0 +1,21 @@
+---
+title: "forward elimination"
+author: "Jiayi Shen"
+date: "12/8/2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+```
+
+```{r load data}
+can_reg = read.csv("Cancer_Registry.csv")
+
+#first-round filter of redundant variables
+can_reg = 
+  can_reg %>% 
+  select(Geography, TARGET_deathRate, incidenceRate, povertyPercent,studyPerCap, MedianAge, PctMarriedHouseholds, PctHS25_Over, PctBachDeg25_Over, PctPublicCoverageAlone, PctWhite ) %>%
+  filter(MedianAge < 100) 
+```

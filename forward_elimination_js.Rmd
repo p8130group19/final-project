@@ -46,14 +46,65 @@ Forward selection gives the following model:
     pct_public_coverage_alone + avg_household_size`
 which include 8 variables. 
 
-###Check Multicolinearity
-```{r}
+```{r skim}
+can_reg_omit %>% 
+  select(pct_bach_deg25_over, pct_married_households, 
+    pct_hs25_over, pct_unemployed16_over, birth_rate, median_age, 
+    pct_public_coverage_alone, avg_household_size) %>% 
+  skimr::skim()
+```
+`birth_rate` is a little left-skewed. All other variables look fine. 
+
+```{r diagonostic plot}
 forward1 = lm(formula = target_death_rate ~ pct_bach_deg25_over + pct_married_households + 
     pct_hs25_over + pct_unemployed16_over + birth_rate + median_age + 
     pct_public_coverage_alone + avg_household_size, data = can_reg_omit)
+
+
+summary(forward1)
+plot(forward1)
+```
+Though global F test on this model tells us that the model coefficients are significant, Adjusted R-squared is only 0.3465. **we might need to consider further adjustment or other models to get better goodness of fit.**
+
+Residuals V.S. Fitted : 
+- outliers 1211, 1355, 1478;
+- scattered around 0. 
+
+QQ plot:
+- straight line in the middle region;
+- when standardized residuals are small or large, there is a slight deviation. 
+
+Scale-location:
+- generally in agreement with the Res VS Fitted plot; 
+
+Residuals VS leverage:
+- No point beyond the cook's distance line
+
+
+```{r Multicolinearity}
 #check multicolinearity
 faraway::vif(forward1) %>% knitr::kable()
 ```
 All variables in this model have VIF less than 5. Generally good.
 
 
+```{r Cross Validation}
+library(modelr)
+library(mgcv)
+set.seed(1)
+
+cv_forward1 = 
+  crossv_mc(can_reg_omit, 10) %>% 
+  mutate(train = map(train, as_tibble),
+         test = map(test, as_tibble)) %>% 
+  mutate(model = map(train, ~lm(formula = target_death_rate ~ pct_bach_deg25_over + pct_married_households + 
+    pct_hs25_over + pct_unemployed16_over + birth_rate + median_age + 
+    pct_public_coverage_alone + avg_household_size, data = .x))) %>% 
+  mutate(mse = map2_dbl(model, test, ~mse(model = .x, data = .y)))
+
+
+mean(cv_forward1$mse) #516.0276
+mse(model = forward1, data = can_reg_omit) #501.2589
+```
+
+The MSE of test data is close to the MSE of the original (training) data.  

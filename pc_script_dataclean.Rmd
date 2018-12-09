@@ -1,0 +1,27 @@
+---
+title: "pc_script"
+author: "pc2853"
+date: "December 8, 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+```
+
+load 
+```{r}
+can_reg = read.csv("Cancer_Registry.csv")
+```
+
+manipulation of levels of categorical variables
+```{r}
+can_reg_omit = can_reg %>% 
+  janitor::clean_names() %>% 
+  select( -pct_some_col18_24, -pct_no_hs18_24, -pct_hs18_24, -pct_bach_deg18_24, -avg_ann_count, -incidence_rate, -avg_deaths_per_year, -med_income, -pop_est2015, -median_age_male, -median_age_female, -percent_married, -pct_employed16_over, -pct_private_coverage, -pct_private_coverage_alone, -pct_emp_priv_coverage, -pct_public_coverage, -pct_black, -pct_asian, -pct_other_race) %>% 
+  na.omit() 
+  # %>% mutate(pct_white = ifelse(pct_white > 80, 1, 0))
+  
+corrplot::corrplot(cor(can_reg_omit[sapply(can_reg_omit,is.numeric)]))
+```
+

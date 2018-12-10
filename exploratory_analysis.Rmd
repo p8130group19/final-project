@@ -19,7 +19,7 @@ skimr::skim_with(numeric = list(hist = NULL,min = min,max = max,kurtosis = e1071
                                 cv = function(x){sd(x, na.rm = T)/mean(x, na.rm = T)}
                                 ))
 skimr::skim_with_defaults() #if having trouble with the above, try this or just subset teh columns that you  wish to skim.
-can_reg %>% skimr::skim()
+can_reg %>% skimr::skim() #should replace the skimr results with the cleaned dataset.
 Amelia::missmap(can_reg)
 can_reg[,c(1,2,4:8,11:12,14:17,19:21,23:24,26:34)] %>% GGally::ggpairs()
 corrplot::corrplot(cor(can_reg[sapply(can_reg,is.numeric)]))
@@ -135,7 +135,7 @@ region_table<- tibble::tibble(state.name,state.abb,state.region)
 #get state variable from county.
 #transform this to something that can be merged.
 #merge on region data using state.
-can_reg$Geography
+#can_reg$Geography
 can_reg_state <- can_reg %>% 
   janitor::clean_names() %>% 
   tidyr::separate(geography, c("county","state"), sep=", ", remove = FALSE) %>% 
@@ -236,13 +236,15 @@ best.lambda<-cv.out$lambda.min
 ridge.pred <- predict(cv.out,s=best.lambda,newx=X[test,])
 mean((ridge.pred-Y.test)^2) #MSE
 ridge3<-glmnet(X, Y, alpha=0, lambda=best.lambda)
-res_ridge_ls<- cbind(coef(mult.fit),coef(ridge3))
-colnames(res_ridge_ls) <- c("LS", "Ridge")
-res_ridge_ls %>% as.matrix() %>% as.data.frame() %>% add_rownames() %>% as.tibble() %>% 
-  mutate(abs_ridge = abs(Ridge)) %>% 
+# res_ridge_ls<- cbind(coef(mult.fit),coef(ridge3))
+# colnames(res_ridge_ls) <- c("LS", "Ridge")
+res_ridge <- coef(ridge3) 
+res_ridge %>% as.matrix() %>% as.data.frame() %>% add_rownames() %>% as.tibble() %>% 
+  mutate(abs_ridge = abs(s0)) %>% 
   arrange(-abs_ridge)
 ridge3$dev.ratio
 #can_reg_lasso$beta %>% View
+final_ridge<-ridge3
 ```
 Not surprisingly, the individual incidence rates tend to dominate the coefficients of the model. We'll try it out. Alternatively. We could use the top incidence rate per county as a factor and that may not overwhelm the model too much.  Besides these, the state region tends to be one of the largest predictors, as does the average household size and and the percent of married households. The dev ratio upon this run is 0.735. It does include some incidence data, so this may be somewhat expected.
 
@@ -271,15 +273,31 @@ best.lambda<-cv.out$lambda.min
 ridge.pred <- predict(cv.out,s=best.lambda,newx=X[test,])
 mean((ridge.pred-Y.test)^2) #MSE
 ridge3<-glmnet(X, Y, alpha=0, lambda=best.lambda)
-res_ridge_ls<- cbind(coef(mult.fit),coef(ridge3))
-colnames(res_ridge_ls) <- c("LS", "Ridge")
-res_ridge_ls %>% as.matrix() %>% as.data.frame() %>% add_rownames() %>% as.tibble() %>% 
-  mutate(abs_ridge = abs(Ridge)) %>% 
+#res_ridge_ls<- cbind(coef(mult.fit),coef(ridge3))
+res_ridge <- coef(ridge3) 
+res_ridge %>% as.matrix() %>% as.data.frame() %>% add_rownames() %>% as.tibble() %>% 
+  mutate(abs_ridge = abs(s0)) %>% 
   arrange(-abs_ridge)
 ridge3$dev.ratio
+final_ridge_no_inc <- ridge3
 ```
 As we take it out, we find that it gains a much lower importance in ridge regression. state_region tends to be the variable with the greatest importance, oddly. I would tend to include it in the final model, based on what we've seen here. Race, median age, and number of clinical trials tends to be several orders of magnitude below the education and employement variables... perhaps suggesting that the variance in Y may be better explained by direct employability measures like education and birth rate (which may be somewhat redundant with average household size). Dev ratio for this model, with a categorical variable for the most common cancer is 0.365, slightly below the adjusted R^2 of the full model after filtering.
 ```{r lasso_regression}
+X = as.matrix(can_filt %>% dplyr::select(-target_death_rate, -brca, -uterine, -bladder, -ovary, -brca_cis, -cervix, -colorectal, -lungbronc, -melanoma, -ovary, -prostate) %>% sapply(as.numeric) %>% na.omit())
+#Y = na.omit(can_filt)$target_death_rate
+Y = as.matrix(can_filt %>% dplyr::select( -bladder, -ovary, -brca_cis,  -brca, -uterine, -cervix, -colorectal, -lungbronc, -melanoma, -ovary, -prostate) %>% sapply(as.numeric) %>% na.omit() %>% .[,"target_death_rate"])
+
+set.seed(1)
+
+train<-sample(1:nrow(X),nrow(X)/2)
+
+test<-(-train)
+
+Y.test<-Y[test]
+set.seed(2)
+doParallel::registerDoParallel()
+grid <- 10^seq(5,-2, length=100)
+
 can_reg_lasso <- glmnet(x = X,y = Y, alpha = 1)
 lasso1<- glmnet(X[train ,],Y[train], alpha =1, lambda =grid)
 set.seed(2)
@@ -290,22 +308,22 @@ lasso2<- glmnet(X, Y, alpha =1, lambda=best.lambda)
 coef(lasso2) %>% as.matrix() %>% as.data.frame() %>% add_rownames() %>% as.tibble() %>% mutate(abs_s0 = abs(s0)) %>% arrange(-abs_s0)
 #coef(mult.fit)
 lasso2$dev.ratio
+final_lasso_no_inc <- lasso2
+plot(lasso1)
+
 ```
 Utilizing lasso, we find that we have almost  precisely the same model. The dev ratio is nearly identical, at 0.3649.
-```{r diagnostics}
-plot(lasso1)
-#res vs fit
-lasso2$dev.ratio
-final_lasso_model <- lasso2
-#
-```
 
 With a dev ratio of 0.3649, this might be a reasonable model... but there may be far better ones from standard linear regression. We'll compare using R^2.  We'll perform the same selection of inital variables as before, or we'll have a fair number of counties ending up with missing data.
 
 ```{r lm_comparison}
+#can_reg_state_copy <- can_reg_state
+#can_reg_state$
+can_reg_state$state.region[can_reg_state$county=="District of Columbia"]<-"South"
 can_reg_state_filtered <- can_reg_state %>% 
   janitor::clean_names() %>% 
 dplyr::select( -pct_some_col18_24, -pct_no_hs18_24, -pct_hs18_24, -pct_bach_deg18_24, -avg_ann_count,  -avg_deaths_per_year, -med_income, -pop_est2015, -median_age_male, -median_age_female, -percent_married, -pct_employed16_over, -pct_private_coverage, -pct_private_coverage_alone, -pct_emp_priv_coverage, -pct_public_coverage, -pct_black, -pct_asian, -pct_other_race, -state_abb, -incidence_rate, -county, -state, -geography)
+
 full_lm <- lm(data = can_reg_state, target_death_rate ~ .)
 can_reg_state_int_only <- lm(data = can_reg_state, target_death_rate ~ 0)
 full_lm_filtered <- lm(data = can_reg_state_filtered, target_death_rate ~ .)
@@ -324,10 +342,14 @@ We'll find that the lasso selected model only has a modest change to the adjuste
 both_model <- stats::step(full_lm_filtered_int_only,scope = list(
   lower=formula(full_lm_filtered_int_only), upper = formula(full_lm_filtered)
   ), direction='both')
+#which(is.na(can_reg_state$state.region))
 
 ```
-Doing the both selection, we'll find there's a single missing value for state_region. It should be obvious how to correct this.
+Doing the both selection, we'll find there's a single missing value for state_region. It should be obvious how to correct this. It's the district of columbia. Considering the state above and below the district are both considered to be in the "South" level (2), we'll assign the same region to it.
+We'll also try an exhaustive method using criteria for Cp and adjusted R^2.
 ```{r leaps}
+leaps::leaps(x = can_reg_state_filtered %>% dplyr::select(-target_death_rate) %>% as.data.frame(), y = can_reg_state_filtered %>% pull(-target_death_rate), nbest = 2, method = "Cp")
+leaps::leaps(x = can_reg_state_filtered %>% dplyr::select(-target_death_rate) %>% as.data.frame(), y = can_reg_state_filtered %>% pull(-target_death_rate), nbest = 2, method = "adjr2")
 
 ```
 

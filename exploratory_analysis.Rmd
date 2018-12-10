@@ -9,6 +9,7 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE, cache = T)
 library(tidyverse)
 library(glmnet)
+library(covTest)
 ```
 ```{r data_import}
 can_reg <- read_csv("Cancer_Registry.csv") 
@@ -329,26 +330,27 @@ can_reg_state_int_only <- lm(data = can_reg_state, target_death_rate ~ 0)
 full_lm_filtered <- lm(data = can_reg_state_filtered, target_death_rate ~ .)
 full_lm_filtered_int_only <- lm(data = can_reg_state_filtered, target_death_rate ~ 0)
 full_lm_filtered %>% summary()
-Amelia::missmap(can_reg_state)
+#Amelia::missmap(can_reg_state)
 plot(full_lm_filtered)
 full_lm_filtered_summary <- summary(full_lm_filtered)
 full_lm_filtered_summary$r.squared
 full_lm_filtered_summary$adj.r.squared
 full_lm %>% summary() %>% .$adj.r.squared
 ```
-We'll find that the lasso selected model only has a modest change to the adjusted R^2 from the full filtered model and may perform better on test data than the full model (may be less overfit). With absolutely no fitering, the R^2=1 and the adjusted R^2 cannot be calculated.
+We'll find that the lasso selected model only has a modest change (about 3%) to the adjusted R^2 from the full filtered model and may perform better on test data than the full model (may be less overfit). With absolutely no fitering, the R^2=1 and the adjusted R^2 cannot be calculated.
 ```{r both_selection}
 
 both_model <- stats::step(full_lm_filtered_int_only,scope = list(
   lower=formula(full_lm_filtered_int_only), upper = formula(full_lm_filtered)
   ), direction='both')
 #which(is.na(can_reg_state$state.region))
-
+both_model$model
+both_model %>% summary()
 ```
-Doing the both selection, we'll find there's a single missing value for state_region. It should be obvious how to correct this. It's the district of columbia. Considering the state above and below the district are both considered to be in the "South" level (2), we'll assign the same region to it.
+Doing the both selection, we'll find there's a single missing value for state_region. It should be obvious how to correct this. It's the district of columbia. Considering the state above and below the district are both considered to be in the "South" level (2), we'll assign the same region to it. The adjusted R^2 is so high, we might suspect it's overfit.
 We'll also try an exhaustive method using criteria for Cp and adjusted R^2.
-```{r leaps}
-leaps::leaps(x = can_reg_state_filtered %>% dplyr::select(-target_death_rate) %>% as.data.frame(), y = can_reg_state_filtered %>% pull(-target_death_rate), nbest = 2, method = "Cp")
+```{r leaps, eval = F}
+leaps::leaps(x = can_reg_state_filtered %>% dplyr::select(-target_death_rate) %>% as.data.frame(), y = can_reg_state_filtered %>% pull(target_death_rate), nbest = 2, method = "Cp")
 leaps::leaps(x = can_reg_state_filtered %>% dplyr::select(-target_death_rate) %>% as.data.frame(), y = can_reg_state_filtered %>% pull(-target_death_rate), nbest = 2, method = "adjr2")
 
 ```

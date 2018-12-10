@@ -252,9 +252,9 @@ cancer_names <- list.files("can_inc") %>% gsub(x = ., pattern = ".csv", replacem
 #colnames(X)[max.col(X[,cancer_names],ties.method="first")]
 # can_filt$top_can <- colnames(can_filt[,cancer_names])[apply(can_filt[,cancer_names],1,which.max) %>% unlist()]
 can_filt$top_can <- apply(can_filt[,cancer_names],1,which.max) %>% map(.x = ., .f = ~ifelse(length(.)==0,"none",cancer_names[.])) %>% unlist() %>% as.factor()
-X = as.matrix(can_filt %>% dplyr::select(-target_death_rate, -bladder, -ovary, -brca_cis, -cervix, -colorectal, -lungbronc, -melanoma, -ovary, -prostate) %>% sapply(as.numeric) %>% na.omit())
+X = as.matrix(can_filt %>% dplyr::select(-target_death_rate, -brca, -uterine, -bladder, -ovary, -brca_cis, -cervix, -colorectal, -lungbronc, -melanoma, -ovary, -prostate) %>% sapply(as.numeric) %>% na.omit())
 #Y = na.omit(can_filt)$target_death_rate
-Y = as.matrix(can_filt %>% dplyr::select( -bladder, -ovary, -brca_cis, -cervix, -colorectal, -lungbronc, -melanoma, -ovary, -prostate) %>% sapply(as.numeric) %>% na.omit() %>% .[,"target_death_rate"])
+Y = as.matrix(can_filt %>% dplyr::select( -bladder, -ovary, -brca_cis,  -brca, -uterine, -cervix, -colorectal, -lungbronc, -melanoma, -ovary, -prostate) %>% sapply(as.numeric) %>% na.omit() %>% .[,"target_death_rate"])
 
 set.seed(1)
 
@@ -278,13 +278,36 @@ res_ridge_ls %>% as.matrix() %>% as.data.frame() %>% add_rownames() %>% as.tibbl
   arrange(-abs_ridge)
 
 ```
-As we take it out, we find that it gains a much lower importance in ridge regression. We also notice that our MSE becomes much higher and we could be overfitting our model.
+As we take it out, we find that it gains a much lower importance in ridge regression. state_region tends to be the variable with the greatest importance, oddly. I would tend to include it in the final model, based on what we've seen here. Race, median age, and number of clinical trials tends to be several orders of magnitude below the education and employement variables... perhaps suggesting that the variance in Y may be better explained by direct employability measures like education and birth rate (which may be somewhat redundant with average household size).
 ```{r lasso_regression}
 can_reg_lasso <- glmnet(x = X,y = Y, alpha = 1)
+lasso1<- glmnet(X[train ,],Y[train], alpha =1, lambda =grid)
+set.seed(2)
+cv.out<-cv.glmnet(X[train,],Y[train])
+plot(cv.out)
+best.lambda<-cv.out$lambda.min
+lasso2<- glmnet(X, Y, alpha =1, lambda=best.lambda)
+coef(lasso2) %>% as.matrix() %>% as.data.frame() %>% add_rownames() %>% as.tibble() %>% mutate(abs_s0 = abs(s0)) %>% arrange(-abs_s0)
+#coef(mult.fit)
 
 ```
+Utilizing lasso, we find that we have almost  precisely the same model.
+```{r diagnostics}
+plot(lasso1)
+#res vs fit
+lasso2$dev.ratio
 
-```{r_elastic_net}
+#
+```
+
+With a dev ratio of 0.36, this might be a reasonable model... but there may be far better ones from standard linear regression.
+
+```{r  elastic_net}
+full_model <- stats::lm(data = can_reg_state, target_death_rate ~ .)
+full_model %>% summary()
+res_ls_ridge_lasso<- cbind(coef(mult.fit),coef(ridge3),coef(lasso2))
+colnames(res_ls_ridge_lasso) <- c("LS", "Ridge","Lasso")
+res_ls_ridge_lasso
 
 ```
 

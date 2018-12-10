@@ -15,7 +15,7 @@ library(tidyverse)
 can_reg = read.csv(file = "./Cancer_Registry.csv")
 can_reg_omit = can_reg %>% 
   janitor::clean_names() %>% 
-  select(-pct_some_col18_24, -pct_no_hs18_24, -pct_hs18_24, -pct_bach_deg18_24, -avg_ann_count, -incidence_rate, -avg_deaths_per_year, -med_income, -pop_est2015, -median_age_male, -median_age_female, -percent_married, -pct_employed16_over, -pct_private_coverage, -pct_private_coverage_alone, -pct_emp_priv_coverage, -pct_public_coverage, -pct_black, -pct_asian, -pct_other_race) %>% 
+  select(-pct_some_col18_24, -pct_no_hs18_24, -pct_hs18_24, -pct_bach_deg18_24, -avg_ann_count, -avg_deaths_per_year, -med_income, -pop_est2015, -median_age_male, -median_age_female, -percent_married, -pct_employed16_over, -pct_private_coverage, -pct_private_coverage_alone, -pct_emp_priv_coverage, -pct_public_coverage, -pct_black, -pct_asian, -pct_other_race) %>% 
   na.omit()%>%
   filter(median_age < 100)%>%
   select(geography, target_death_rate, binned_inc, everything())
@@ -39,12 +39,11 @@ step(initial_fit, direction = "backward")
 ```
 
 After backward elimination, the final model is : 
-target_death_rate ~ binned_inc + poverty_percent + 
-    study_per_cap + median_age + avg_household_size + pct_hs25_over + 
-    pct_bach_deg25_over + pct_unemployed16_over + pct_public_coverage_alone + 
-    pct_married_households + birth_rate
+target_death_rate ~ binned_inc + incidence_rate + 
+    median_age + pct_hs25_over + pct_bach_deg25_over + pct_unemployed16_over + 
+    pct_public_coverage_alone + pct_married_households + birth_rate
     
-There are 11 variables in the model.
+There are 9 variables in the model.
 
 ##Check the distribution of variables
 ```{r}
@@ -60,10 +59,9 @@ pct_white, poverty_percent and study_per_cap are a little skewed, other variable
 ##Model diagnosis
 ```{r}
 ##summary of final model
-back_model = lm(formula = target_death_rate ~ binned_inc + poverty_percent + 
-    study_per_cap + median_age + avg_household_size + pct_hs25_over + 
-    pct_bach_deg25_over + pct_unemployed16_over + pct_public_coverage_alone + 
-    pct_married_households + birth_rate, data = can_reg_back)
+back_model = lm(formula = target_death_rate ~ binned_inc + incidence_rate + 
+    median_age + pct_hs25_over + pct_bach_deg25_over + pct_unemployed16_over + 
+    pct_public_coverage_alone + pct_married_households + birth_rate, data = can_reg_back)
 #check model assumption
 summary(back_model)
 par(mar=c(2,2,1,1))
@@ -78,11 +76,11 @@ faraway::vif(back_model)%>%knitr::kable()
 
 * From Residual and Leverage plot, we observe the potential outlier: 1050, 1924 and 1301
 
-* The global F-statistic is 87.4， indicating the linear relationship between the outcome and the covariates is significant. However， there are still covariates that are insignifficant and the adjusted R square is low (0.3525).
+* The global F-statistic is 174.1， indicating the linear relationship between the outcome and the covariates is significant. However， there are still covariates that are insignifficant and the adjusted R square is low (0.4938).
 
-*poverty_percent  is over 5, it might be misleading due to collinearity. And binned_inc(61494.5, 125635] is slightly over 5.
+*VIF: No variables has VIF over 5, indicating they don't have much overlapped information.
 
-*Further modificaton may be needed
+*Further modificaton may be needed(The adjusted R square went higher, but still requires improving)
 
 ##Model validation
 ```{r}
@@ -90,10 +88,9 @@ library(caret)
 #Use 10-fold validation and create the training sets
 data_train<-trainControl(method="cv", number=10)
 # Fit the 4-variables model that we discussed in previous lectures
-model_caret<-train(target_death_rate ~ binned_inc + poverty_percent + 
-    study_per_cap + median_age + avg_household_size + pct_hs25_over + 
-    pct_bach_deg25_over + pct_unemployed16_over + pct_public_coverage_alone + 
-    pct_married_households + birth_rate,
+model_caret<-train(target_death_rate ~ binned_inc + incidence_rate + 
+    median_age + pct_hs25_over + pct_bach_deg25_over + pct_unemployed16_over + 
+    pct_public_coverage_alone + pct_married_households + birth_rate,
                    data=can_reg_omit,
                    trControl=data_train,
                    method='lm',
@@ -119,77 +116,3 @@ summary(fold$MSE)
 ```
 
 
-##modification of backward model
-```{r}
-summary(initial_fit)
-#remove pct_white
-step1<-update(initial_fit, . ~ . -pct_white)
-summary(step1)
-#remove poverty  percent
-step2<-update(step1, .~. -poverty_percent)
-summary(step2)
-```
-
-
-#Part2
-
-##Model diagnosis
-```{r}
-##summary of final model
-back_model_new = lm(formula = target_death_rate ~ binned_inc + 
-    study_per_cap + median_age + avg_household_size + pct_hs25_over + 
-    pct_bach_deg25_over + pct_unemployed16_over + pct_public_coverage_alone + 
-    pct_married_households + birth_rate, data = can_reg_back)
-#check model assumption
-summary(back_model_new)
-par(mar=c(2,2,1,1))
-plot(back_model_new)
-#check multicollinearity
-faraway::vif(back_model_new)%>%knitr::kable()
-```
-
-*  From residual and scale location figure, I found the points distributed evenly around the horizontal line, indicating the constant variance
-
-*  From QQ plot, we can observe a tail deviating from normal, which doubts the normality of residuals.
-
-* From Residual and Leverage plot, we observe the potential outlier: 1050, 1924 and 1301
-
-* The global F-statistic is 92.09， indicating the linear relationship between the outcome and the covariates is significant. However， there are still covariates that are insignifficant and the adjusted R square is low (0.3522).[slightly lower than model 1]
-
-*binned_inc(61494.5, 125635] is slightly over 5.But overall, there is no multicollinearity.
-
-*Further modificaton may be needed to get better fitness
-
-##Model validation
-```{r}
-library(caret)
-#Use 10-fold validation and create the training sets
-data_train<-trainControl(method="cv", number=10)
-# Fit the 4-variables model that we discussed in previous lectures
-model_caret<-train(target_death_rate ~ binned_inc +  
-    study_per_cap + median_age + avg_household_size + pct_hs25_over + 
-    pct_bach_deg25_over + pct_unemployed16_over + pct_public_coverage_alone + 
-    pct_married_households + birth_rate,
-                   data=can_reg_omit,
-                   trControl=data_train,
-                   method='lm',
-                   na.action=na.pass)
-  
-# Model predictions using 4 parts of the data fro training 
-model_caret
-# Model coefficients
-model_caret$finalModel
-# Examine model prediction for each fold
-fold =model_caret$resample%>%
-  as.tibble%>%
-  mutate(MSE = RMSE^2)
-# look at the summary of MSE
-summary(fold$MSE)
-#mse of original model in the full dataset
-#lm(target_death_rate ~ binned_inc + poverty_percent + 
-#   study_per_cap + median_age + avg_household_size + pct_hs25_over + 
-#  pct_bach_deg25_over + pct_unemployed16_over + pct_public_coverage_alone + 
-#pct_married_households + birth_rate,
- #                  data=can_reg_omit)%>%
-#mse(data = can_reg_omit)
-```

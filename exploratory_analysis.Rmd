@@ -28,7 +28,6 @@ We'll find that several variables have a great deal of missing data. In particul
 Column 9 (binnedInc) is a factor, as is column 13 (county). Pct unemployed presents similar information to the percent employed, so we could choose to include the percent employed rather than the unemployed percetange.
 ```{r lasso}
 can_reg_lasso <- glmnet(x = as.matrix(can_reg[,c(1,2,4:8,11:12,14:17,19:21,23:24,26:34)]),y = can_reg$TARGET_deathRate, alpha = 1)
-
 ```
 
 ```{r education}
@@ -125,13 +124,6 @@ can_reg_over_100[,c("Geography","MedianAge")]
 
 ```
 
-```{r aggregate_geography_into_regions}
-
-```
-
-```{r append_incidence_data_following_literature_search}
-
-```
 
 ```{r married}
 all_pairwise_corr_sorted %>%
@@ -147,11 +139,13 @@ can_reg$Geography
 can_reg_state <- can_reg %>% 
   janitor::clean_names() %>% 
   tidyr::separate(geography, c("county","state"), sep=", ", remove = FALSE) %>% 
-  dplyr::select( county, state, geography, everything()) %>% 
-  left_join(region_table, by = c("state" = "state.name"))
+#  dplyr::select( county, state, geography, everything()) %>% 
+  dplyr::left_join(region_table, by = c("state" = "state.name"))
+#  merge(x = .,y = region_table, by.x="state",by.y = "state.name")
 #Amelia::missmap(can_reg_state) #No new missing data from a bad merge.
 
-
+setdiff(names(can_reg %>% janitor::clean_names()),names(can_reg_state))
+setdiff(names(can_reg_state),names(can_reg %>% janitor::clean_names()))
 ```
 ```{r adding_incidence_rates, eval = F}
 #add incidence rates from https://www.statecancerprofiles.cancer.gov/incidencerates/
@@ -203,7 +197,7 @@ can_reg_joined <- can_reg_joined %>%
   left_join(additional_cancer_cols[[i]], by=c("county" = "county", "state" = "state")) %>% 
   mutate(incidence = as.numeric(incidence)) %>% 
   dplyr::select(-cancer)
-  names(can_reg_joined) <- gsub(pattern = "incidence",replacement = paste0(names(additional_cancer_cols)[i]),x = names(can_reg_joined))
+  names(can_reg_joined) <- gsub(pattern = "^incidence$",replacement = paste0(names(additional_cancer_cols)[i]),x = names(can_reg_joined))
   #mutate(paste0(names(additional_cancer_cols)[i]) = incidence)
   
 }
@@ -211,7 +205,12 @@ write_csv(x = can_reg_joined, path =   "can_reg_joined.csv")
 ```
 
 ```{r pick_lambda_based_on_cv}
-
+can_reg_joined
+can_reg_lasso <- glmnet(x = as.matrix(can_reg[,c(1,2,4:8,11:12,14:17,19:21,23:24,26:34)]),y = can_reg$TARGET_deathRate, alpha = 1)
+#X <- as.matrix(dat_state[,-4])
+can_reg_inc_reg_filtered <- can_reg_joined %>% 
+  janitor::clean_names() %>% 
+dplyr::select( -pct_some_col18_24, -pct_no_hs18_24, -pct_hs18_24, -pct_bach_deg18_24, -avg_ann_count,  -avg_deaths_per_year, -med_income, -pop_est2015, -median_age_male, -median_age_female, -percent_married, -pct_employed16_over, -pct_private_coverage, -pct_private_coverage_alone, -pct_emp_priv_coverage, -pct_public_coverage, -pct_black, -pct_asian, -pct_other_race, -state_abb)
 ```
 
 ```{r ridge_regression}

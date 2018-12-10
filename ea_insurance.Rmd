@@ -23,10 +23,14 @@ the HR for death in black versus white women is 1.54 (95% CI, 1.47 to 1.62) when
 
 ```{r load data}
 can_reg = read.csv("Cancer_Registry.csv")
-can_reg_insurance = select(can_reg, PctPrivateCoverage:PctPublicCoverageAlone)
+can_reg_insurance = select(can_reg,Geography,TARGET_deathRate, PctPrivateCoverage:PctPublicCoverageAlone)
 
 #return rows with NAs with respect to insurance variables.
 dim(can_reg_insurance[which(!complete.cases(can_reg_insurance)),])
+
+#VIF
+faraway::vif(select(can_reg, - Geography, - binnedInc, - PctSomeCol18_24)) %>% as.data.frame()
+
 ```
 
 - 609 missing values in `PctPrivateCoverageAlone`.
@@ -50,11 +54,23 @@ hist(can_reg$PctPublicCoverageAlone)
 ## reference category
 ```{r}
 # try make a reference group (i.e. uninsuranced??)
+can_reg_insurance = 
 can_reg_insurance %>% 
-  mutate(no_insurance = 100 - 0.5*(PctPrivateCoverage + PctPrivateCoverageAlone + PctPublicCoverage + PctPublicCoverageAlone)) %>% pull(no_insurance)
+  mutate(no_insurance = 100 - 0.5*(PctPrivateCoverage + PctPrivateCoverageAlone + PctPublicCoverage + PctPublicCoverageAlone))
+
+# try binary variable
 ```
 
 Questions:
 - do we need to do stratified analysis?? (by age, gender and other factor of interest)
 
+
+```{r correlation between insurance variables}
+
+can_reg_insurance %>% 
+  na.omit() %>% 
+  select(-Geography) %>% 
+  cor()
+
+```
 

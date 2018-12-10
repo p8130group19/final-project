@@ -241,10 +241,10 @@ colnames(res_ridge_ls) <- c("LS", "Ridge")
 res_ridge_ls %>% as.matrix() %>% as.data.frame() %>% add_rownames() %>% as.tibble() %>% 
   mutate(abs_ridge = abs(Ridge)) %>% 
   arrange(-abs_ridge)
-
+ridge3$dev.ratio
 #can_reg_lasso$beta %>% View
 ```
-Not surprisingly, the individual incidence rates tend to dominate the coefficients of the model. We'll try it out. Alternatively. We could use the top incidence rate per county as a factor and that may not overwhelm the model too much.  Besides these, the state region tends to be one of the largest predictors, as does the average household size and and the percent of married households.
+Not surprisingly, the individual incidence rates tend to dominate the coefficients of the model. We'll try it out. Alternatively. We could use the top incidence rate per county as a factor and that may not overwhelm the model too much.  Besides these, the state region tends to be one of the largest predictors, as does the average household size and and the percent of married households. The dev ratio upon this run is 0.735. It does include some incidence data, so this may be somewhat expected.
 
 ```{r}
 cancer_names <- list.files("can_inc") %>% gsub(x = ., pattern = ".csv", replacement = "")
@@ -276,9 +276,9 @@ colnames(res_ridge_ls) <- c("LS", "Ridge")
 res_ridge_ls %>% as.matrix() %>% as.data.frame() %>% add_rownames() %>% as.tibble() %>% 
   mutate(abs_ridge = abs(Ridge)) %>% 
   arrange(-abs_ridge)
-
+ridge3$dev.ratio
 ```
-As we take it out, we find that it gains a much lower importance in ridge regression. state_region tends to be the variable with the greatest importance, oddly. I would tend to include it in the final model, based on what we've seen here. Race, median age, and number of clinical trials tends to be several orders of magnitude below the education and employement variables... perhaps suggesting that the variance in Y may be better explained by direct employability measures like education and birth rate (which may be somewhat redundant with average household size).
+As we take it out, we find that it gains a much lower importance in ridge regression. state_region tends to be the variable with the greatest importance, oddly. I would tend to include it in the final model, based on what we've seen here. Race, median age, and number of clinical trials tends to be several orders of magnitude below the education and employement variables... perhaps suggesting that the variance in Y may be better explained by direct employability measures like education and birth rate (which may be somewhat redundant with average household size). Dev ratio for this model, with a categorical variable for the most common cancer is 0.365, slightly below the adjusted R^2 of the full model after filtering.
 ```{r lasso_regression}
 can_reg_lasso <- glmnet(x = X,y = Y, alpha = 1)
 lasso1<- glmnet(X[train ,],Y[train], alpha =1, lambda =grid)
@@ -289,20 +289,50 @@ best.lambda<-cv.out$lambda.min
 lasso2<- glmnet(X, Y, alpha =1, lambda=best.lambda)
 coef(lasso2) %>% as.matrix() %>% as.data.frame() %>% add_rownames() %>% as.tibble() %>% mutate(abs_s0 = abs(s0)) %>% arrange(-abs_s0)
 #coef(mult.fit)
-
+lasso2$dev.ratio
 ```
-Utilizing lasso, we find that we have almost  precisely the same model.
+Utilizing lasso, we find that we have almost  precisely the same model. The dev ratio is nearly identical, at 0.3649.
 ```{r diagnostics}
 plot(lasso1)
 #res vs fit
 lasso2$dev.ratio
-
+final_lasso_model <- lasso2
 #
 ```
 
-With a dev ratio of 0.36, this might be a reasonable model... but there may be far better ones from standard linear regression. We'll compare and see how they perform.
+With a dev ratio of 0.3649, this might be a reasonable model... but there may be far better ones from standard linear regression. We'll compare using R^2.  We'll perform the same selection of inital variables as before, or we'll have a fair number of counties ending up with missing data.
+
+```{r lm_comparison}
+can_reg_state_filtered <- can_reg_state %>% 
+  janitor::clean_names() %>% 
+dplyr::select( -pct_some_col18_24, -pct_no_hs18_24, -pct_hs18_24, -pct_bach_deg18_24, -avg_ann_count,  -avg_deaths_per_year, -med_income, -pop_est2015, -median_age_male, -median_age_female, -percent_married, -pct_employed16_over, -pct_private_coverage, -pct_private_coverage_alone, -pct_emp_priv_coverage, -pct_public_coverage, -pct_black, -pct_asian, -pct_other_race, -state_abb, -incidence_rate, -county, -state, -geography)
+full_lm <- lm(data = can_reg_state, target_death_rate ~ .)
+can_reg_state_int_only <- lm(data = can_reg_state, target_death_rate ~ 0)
+full_lm_filtered <- lm(data = can_reg_state_filtered, target_death_rate ~ .)
+full_lm_filtered_int_only <- lm(data = can_reg_state_filtered, target_death_rate ~ 0)
+full_lm_filtered %>% summary()
+Amelia::missmap(can_reg_state)
+plot(full_lm_filtered)
+full_lm_filtered_summary <- summary(full_lm_filtered)
+full_lm_filtered_summary$r.squared
+full_lm_filtered_summary$adj.r.squared
+full_lm %>% summary() %>% .$adj.r.squared
+```
+We'll find that the lasso selected model only has a modest change to the adjusted R^2 from the full filtered model and may perform better on test data than the full model (may be less overfit). With absolutely no fitering, the R^2=1 and the adjusted R^2 cannot be calculated.
+```{r both_selection}
+
+both_model <- stats::step(full_lm_filtered_int_only,scope = list(
+  lower=formula(full_lm_filtered_int_only), upper = formula(full_lm_filtered)
+  ), direction='both')
+
+```
+Doing the both selection, we'll find there's a single missing value for state_region. It should be obvious how to correct this.
+```{r leaps}
+
+```
 
 ```{r  elastic_net}
+
 res_ls_ridge_lasso<- cbind(coef(mult.fit),coef(ridge3),coef(lasso2))
 colnames(res_ls_ridge_lasso) <- c("LS", "Ridge","Lasso")
 res_ls_ridge_lasso

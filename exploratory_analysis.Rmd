@@ -350,21 +350,35 @@ both_model %>% summary()
 Doing the both selection, we'll find there's a single missing value for state_region. It should be obvious how to correct this. It's the district of columbia. Considering the state above and below the district are both considered to be in the "South" level (2), we'll assign the same region to it. The adjusted R^2 is so high, we might suspect it's overfit.
 We'll also try an exhaustive method using criteria for Cp and adjusted R^2.
 ```{r leaps, eval = F}
-leaps::leaps(x = can_reg_state_filtered %>% dplyr::select(-target_death_rate) %>% as.data.frame(), y = can_reg_state_filtered %>% pull(target_death_rate), nbest = 2, method = "Cp")
-leaps::leaps(x = can_reg_state_filtered %>% dplyr::select(-target_death_rate) %>% as.data.frame(), y = can_reg_state_filtered %>% pull(-target_death_rate), nbest = 2, method = "adjr2")
+#this crashes my R session. Moving on.
+# leaps::leaps(x = can_reg_state_filtered %>% dplyr::select(-target_death_rate) %>% as.data.frame(), y = can_reg_state_filtered %>% pull(target_death_rate), nbest = 2, method = "Cp")
+# leaps::leaps(x = can_reg_state_filtered %>% dplyr::select(-target_death_rate) %>% as.data.frame(), y = can_reg_state_filtered %>% pull(-target_death_rate), nbest = 2, method = "adjr2")
+
+```
+```{r lasso_diags}
+plotmo::plotres(final_lasso_no_inc) #still having a couple issues with these. Feel free to try a different package if these don't work well.
+plotmo::plotres(final_ridge_no_inc)
+plot(full_lm_filtered)
+plot(both_model)
+```
+```{r outliers}
+outlier_counties <- can_reg_state$county[c(1221,1336,1490)]
+can_reg_state[can_reg_state$MedianAge>100,] #median age no longer exists.
+#no influence points.
 
 ```
 
 ```{r  elastic_net}
 
-res_ls_ridge_lasso<- cbind(coef(mult.fit),coef(ridge3),coef(lasso2))
-colnames(res_ls_ridge_lasso) <- c("LS", "Ridge","Lasso")
-res_ls_ridge_lasso
+# res_ls_ridge_lasso<- cbind(coef(mult.fit),coef(ridge3),coef(lasso2))
+# colnames(res_ls_ridge_lasso) <- c("LS", "Ridge","Lasso")
+# res_ls_ridge_lasso
 
 ```
 
 ```{r assumptions}
-
+#use covTest to get predictions
+#get residualsl
 ```
 
 ```{r PCA}

@@ -118,6 +118,78 @@ summary(fold$MSE)
 #mse(data = can_reg_omit)
 ```
 
-* 
+
+##modification of backward model
+```{r}
+summary(initial_fit)
+#remove pct_white
+step1<-update(initial_fit, . ~ . -pct_white)
+summary(step1)
+#remove poverty  percent
+step2<-update(step1, .~. -poverty_percent)
+summary(step2)
+```
 
 
+#Part2
+
+##Model diagnosis
+```{r}
+##summary of final model
+back_model_new = lm(formula = target_death_rate ~ binned_inc + 
+    study_per_cap + median_age + avg_household_size + pct_hs25_over + 
+    pct_bach_deg25_over + pct_unemployed16_over + pct_public_coverage_alone + 
+    pct_married_households + birth_rate, data = can_reg_back)
+#check model assumption
+summary(back_model_new)
+par(mar=c(2,2,1,1))
+plot(back_model_new)
+#check multicollinearity
+faraway::vif(back_model_new)%>%knitr::kable()
+```
+
+*  From residual and scale location figure, I found the points distributed evenly around the horizontal line, indicating the constant variance
+
+*  From QQ plot, we can observe a tail deviating from normal, which doubts the normality of residuals.
+
+* From Residual and Leverage plot, we observe the potential outlier: 1050, 1924 and 1301
+
+* The global F-statistic is 92.09， indicating the linear relationship between the outcome and the covariates is significant. However， there are still covariates that are insignifficant and the adjusted R square is low (0.3522).[slightly lower than model 1]
+
+*binned_inc(61494.5, 125635] is slightly over 5.But overall, there is no multicollinearity.
+
+*Further modificaton may be needed to get better fitness
+
+##Model validation
+```{r}
+library(caret)
+#Use 10-fold validation and create the training sets
+data_train<-trainControl(method="cv", number=10)
+# Fit the 4-variables model that we discussed in previous lectures
+model_caret<-train(target_death_rate ~ binned_inc +  
+    study_per_cap + median_age + avg_household_size + pct_hs25_over + 
+    pct_bach_deg25_over + pct_unemployed16_over + pct_public_coverage_alone + 
+    pct_married_households + birth_rate,
+                   data=can_reg_omit,
+                   trControl=data_train,
+                   method='lm',
+                   na.action=na.pass)
+  
+# Model predictions using 4 parts of the data fro training 
+model_caret
+# Model coefficients
+model_caret$finalModel
+# Examine model prediction for each fold
+fold =model_caret$resample%>%
+  as.tibble%>%
+  mutate(MSE = RMSE^2)
+# look at the summary of MSE
+summary(fold$MSE)
+#mse of original model in the full dataset
+#lm(target_death_rate ~ binned_inc + poverty_percent + 
+#   study_per_cap + median_age + avg_household_size + pct_hs25_over + 
+#  pct_bach_deg25_over + pct_unemployed16_over + pct_public_coverage_alone + 
+#pct_married_households + birth_rate,
+ #                  data=can_reg_omit)%>%
+#mse(data = can_reg_omit)
+```

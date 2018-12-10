@@ -208,9 +208,14 @@ write_csv(x = can_reg_joined, path =   "can_reg_joined.csv")
 can_reg_joined
 can_reg_lasso <- glmnet(x = as.matrix(can_reg[,c(1,2,4:8,11:12,14:17,19:21,23:24,26:34)]),y = can_reg$TARGET_deathRate, alpha = 1)
 #X <- as.matrix(dat_state[,-4])
-can_reg_inc_reg_filtered <- can_reg_joined %>% 
+can_filt <- can_reg_joined %>% 
   janitor::clean_names() %>% 
-dplyr::select( -pct_some_col18_24, -pct_no_hs18_24, -pct_hs18_24, -pct_bach_deg18_24, -avg_ann_count,  -avg_deaths_per_year, -med_income, -pop_est2015, -median_age_male, -median_age_female, -percent_married, -pct_employed16_over, -pct_private_coverage, -pct_private_coverage_alone, -pct_emp_priv_coverage, -pct_public_coverage, -pct_black, -pct_asian, -pct_other_race, -state_abb)
+    mutate(binned_inc = as.factor(binned_inc)) %>% 
+  mutate(binned_inc = fct_reorder(.f = binned_inc,.x = med_income)) %>% 
+#  mutate()
+dplyr::select( -pct_some_col18_24, -pct_no_hs18_24, -pct_hs18_24, -pct_bach_deg18_24, -avg_ann_count,  -avg_deaths_per_year, -med_income, -pop_est2015, -median_age_male, -median_age_female, -percent_married, -pct_employed16_over, -pct_private_coverage, -pct_private_coverage_alone, -pct_emp_priv_coverage, -pct_public_coverage, -pct_black, -pct_asian, -pct_other_race, -state_abb, -incidence_rate, -county, -state)
+
+#which(sapply(can_filt,is.character))
 ```
 
 ```{r ridge_regression}

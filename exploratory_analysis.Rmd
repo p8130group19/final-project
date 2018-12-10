@@ -104,11 +104,133 @@ educ_log<-lm(data = na.omit(can_reg), formula =  TARGET_deathRate ~ log(PctNoHS1
 plot(educ_log)
 ```
 
+```{r res_vs_obs}
+can_reg_age <- lm(data=can_reg, TARGET_deathRate ~ MedianAge)
+plot(can_reg$MedianAge[can_reg$MedianAge < 100],can_reg_age$residuals[can_reg$MedianAge < 100])
+```
+```{r}
+can_reg_over_100<- can_reg %>%
+  as.tibble() %>% 
+  filter(MedianAge > 100) 
+can_reg_over_100[,c("Geography","MedianAge")]
+
+can_reg_over_100_female <- can_reg %>%
+  as.tibble() %>% 
+  filter(MedianAgeFemale > 100) 
+can_reg_over_100_male <- can_reg %>%
+  as.tibble() %>% 
+  filter(MedianAgeMale > 100) 
+
+can_reg_over_100[,c("Geography","MedianAge")]
+
+```
+
 ```{r aggregate_geography_into_regions}
 
 ```
 
 ```{r append_incidence_data_following_literature_search}
+
+```
+
+```{r married}
+all_pairwise_corr_sorted %>%
+  filter(var1 %in% c("PercentMarried","PctMarriedHouseholds"))
+```
+
+```{r adding_state_vars}
+region_table<- tibble::tibble(state.name,state.abb,state.region)
+#get state variable from county.
+#transform this to something that can be merged.
+#merge on region data using state.
+can_reg$Geography
+can_reg_state <- can_reg %>% 
+  janitor::clean_names() %>% 
+  tidyr::separate(geography, c("county","state"), sep=", ", remove = FALSE) %>% 
+  dplyr::select( county, state, geography, everything()) %>% 
+  left_join(region_table, by = c("state" = "state.name"))
+#Amelia::missmap(can_reg_state) #No new missing data from a bad merge.
+
+
+```
+```{r adding_incidence_rates, eval = F}
+#add incidence rates from https://www.statecancerprofiles.cancer.gov/incidencerates/
+# additional_cancer_cols <- list.files("can_inc", full.names = T) %>% 
+#   map(read_csv, skip = 9, col_names = c("county","FIPS", "Met_Healthy_People_Objective", "Lower_95_Confidence_Interval", "Upper_95_Confidence_Interval", "Average_Annual_Count",
+#                                          "Recent_Trend","Recent_5_Year_Trend_in_Incidence _Rates", "Lower_95_Confidence_Interval_5yr","Upper_95_Confidence_Interval_5yr"))
+read_can_inc<-function(csvfile)
+{
+  inc_df <- read_csv(csvfile, skip = 8) %>% 
+    janitor::clean_names() %>% 
+    separate(county,into = c("county","state"), sep = ", ") %>% 
+    mutate(state = str_replace(string = state, pattern = "\\(.*", replace = "")) %>%
+    mutate(county = str_replace(string = county, pattern = "\\(.*", replace = "")) %>%
+    mutate(cancer = str_replace(csvfile,pattern = ".csv","")) %>% 
+    mutate(cancer = str_replace(cancer,pattern = "can_inc/","")) %>%
+    mutate(incidence = age_adjusted_incidence_rate_u_0086_cases_per_100_000) %>% 
+    dplyr::select(county,state,age_adjusted_incidence_rate_u_0086_cases_per_100_000,cancer) %>%  filter(!(county %in% c("","1","10","6","7","8")))
+  colnames(inc_df)<-c("county","state","incidence","cancer")
+  return(inc_df)
+}
+additional_cancer_cols <- list.files("can_inc", full.names = T) %>% 
+map(read_can_inc)
+names(additional_cancer_cols) <- list.files("can_inc") %>% gsub(x = .,pattern = ".csv",replacement = "")
+# list.files("can_inc", full.names = T)[2] %>% read_csv(skip = 8)
+# sapply(additional_cancer_cols,dim)
+#  county_diff <- setdiff(additional_cancer_cols[[8]] %>% janitor::clean_names() %>% pull(county),
+#            additional_cancer_cols[[1]] %>% janitor::clean_names() %>% pull(county))
+#  counties_cbind <- rowr::cbind.fill(additional_cancer_cols[[4]] %>% janitor::clean_names() %>% pull(county) %>% sort(),
+#            additional_cancer_cols[[1]] %>% janitor::clean_names() %>% pull(county) %>% sort()) 
+#  colnames(counties_cbind) <- c("ovary","bladder")
+#  counties_cbind %>% arrange(ovary,bladder)
+# additional_cancer_cols <- list.files("can_inc", full.names = T) %>% 
+# read_csv(file = "can_inc/bladder.csv", skip = 8)
+#  county_diff <- setdiff(additional_cancer_cols[[1]] %>% janitor::clean_names() %>% pull(county),
+#            additional_cancer_cols[[4]] %>% janitor::clean_names() %>% pull(county))
+# additional_cancer_cols[[4]]
+can_reg_lung <- can_reg %>% 
+  janitor::clean_names() %>% 
+  separate(geography,into = c("county","state"), sep = ", ") %>% 
+  left_join(additional_cancer_cols[[6]], by=c("county" = "county", "state" = "state")) %>% 
+  mutate(incidence = as.numeric(incidence))
+plyr::join_all()
+can_reg_joined <- can_reg
+for(i in 1:length(additional_cancer_cols))
+{
+can_reg_joined <- can_reg_joined %>% 
+  janitor::clean_names() %>% 
+  separate(geography,into = c("county","state"), sep = ", ", remove = F) %>% 
+  left_join(additional_cancer_cols[[i]], by=c("county" = "county", "state" = "state")) %>% 
+  mutate(incidence = as.numeric(incidence)) %>% 
+  dplyr::select(-cancer)
+  names(can_reg_joined) <- gsub(pattern = "incidence",replacement = paste0(names(additional_cancer_cols)[i]),x = names(can_reg_joined))
+  #mutate(paste0(names(additional_cancer_cols)[i]) = incidence)
+  
+}
+write_csv(x = can_reg_joined, path =  "can_reg_joined.csv")
+```
+
+```{r pick_lambda_based_on_cv}
+
+```
+
+```{r ridge_regression}
+
+```
+
+```{r lasso_regression}
+
+```
+
+```{r_elastic_net}
+
+```
+
+```{r assumptions}
+
+```
+
+```{r PCA}
 
 ```
 

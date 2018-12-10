@@ -303,7 +303,7 @@ lasso2$dev.ratio
 With a dev ratio of 0.36, this might be a reasonable model... but there may be far better ones from standard linear regression.
 
 ```{r  elastic_net}
-full_model <- stats::lm(data = can_reg_state, target_death_rate ~ .)
+full_model <- stats::lm(data = na.omit(can_reg_state), target_death_rate ~ .)
 full_model %>% summary()
 res_ls_ridge_lasso<- cbind(coef(mult.fit),coef(ridge3),coef(lasso2))
 colnames(res_ls_ridge_lasso) <- c("LS", "Ridge","Lasso")

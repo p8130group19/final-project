@@ -534,7 +534,7 @@ faraway::vif(back_model)%&gt;%knitr::kable()</code></pre>
 <ul>
 <li><p>From residual and scale location figure, I found the points distributed evenly around the horizontal line, indicating the constant variance</p></li>
 <li><p>From QQ plot, we can observe a tail deviating from normal, which doubts the normality of residuals.</p></li>
-<li><p>From Residual and Leverage plot, we observe the potential outlier: 1050, 1924 and 1301</p></li>
+<li><p>From Residual and Leverage plot, we observe the potential outlier: 1211, 1355 and 279</p></li>
 <li><p>The global F-statistic is 174.1， indicating the linear relationship between the outcome and the covariates is significant. However， there are still covariates that are insignifficant and the adjusted R square is low (0.4938).</p></li>
 </ul>
 <p>*VIF: No variables has VIF over 5, indicating they don’t have much overlapped information.</p>
@@ -569,11 +569,11 @@ model_caret</code></pre>
 ## 
 ## No pre-processing
 ## Resampling: Cross-Validated (10 fold) 
-## Summary of sample sizes: 2715, 2715, 2715, 2715, 2715, 2716, ... 
+## Summary of sample sizes: 2715, 2716, 2714, 2714, 2716, 2716, ... 
 ## Resampling results:
 ## 
-##   RMSE      Rsquared   MAE     
-##   19.79964  0.4912421  14.76364
+##   RMSE      Rsquared  MAE     
+##   19.79996  0.488871  14.77232
 ## 
 ## Tuning parameter 'intercept' was held constant at a value of TRUE</code></pre>
 <pre class="r"><code># Model coefficients
@@ -608,7 +608,210 @@ fold =model_caret$resample%&gt;%
 # look at the summary of MSE
 summary(fold$MSE)</code></pre>
 <pre><code>##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
-##   322.7   371.5   394.6   392.7   420.8   432.8</code></pre>
+##   325.7   362.3   394.5   393.0   418.8   461.0</code></pre>
+<pre class="r"><code>#mse of original model in the full dataset
+#lm(target_death_rate ~ binned_inc + poverty_percent + 
+#   study_per_cap + median_age + avg_household_size + pct_hs25_over + 
+#  pct_bach_deg25_over + pct_unemployed16_over + pct_public_coverage_alone + 
+#pct_married_households + birth_rate,
+ #                  data=can_reg_omit)%&gt;%
+#mse(data = can_reg_omit)</code></pre>
+</div>
+<div id="check-model-removing-binned_inc" class="section level2">
+<h2>Check model removing binned_inc</h2>
+<pre class="r"><code>#backward elimination
+ can_reg_back = can_reg_omit%&gt;%
+  select(-geography)
+
+initial_fit_1 = lm(target_death_rate~., data = select(can_reg_back, -binned_inc))
+step(initial_fit_1, direction = &quot;backward&quot;)</code></pre>
+<pre><code>## Start:  AIC=18059.8
+## target_death_rate ~ incidence_rate + poverty_percent + study_per_cap + 
+##     median_age + avg_household_size + pct_hs25_over + pct_bach_deg25_over + 
+##     pct_unemployed16_over + pct_public_coverage_alone + pct_white + 
+##     pct_married_households + birth_rate
+## 
+##                             Df Sum of Sq     RSS   AIC
+## - avg_household_size         1         6 1189946 18058
+## - study_per_cap              1        78 1190018 18058
+## - pct_white                  1       427 1190367 18059
+## &lt;none&gt;                                   1189940 18060
+## - pct_married_households     1      3320 1193260 18066
+## - median_age                 1      3575 1193515 18067
+## - pct_public_coverage_alone  1      4512 1194452 18069
+## - pct_unemployed16_over      1      5818 1195758 18072
+## - poverty_percent            1      6412 1196352 18074
+## - birth_rate                 1      6679 1196620 18075
+## - pct_hs25_over              1     24544 1214484 18119
+## - pct_bach_deg25_over        1     24819 1214759 18120
+## - incidence_rate             1    321300 1511240 18779
+## 
+## Step:  AIC=18057.82
+## target_death_rate ~ incidence_rate + poverty_percent + study_per_cap + 
+##     median_age + pct_hs25_over + pct_bach_deg25_over + pct_unemployed16_over + 
+##     pct_public_coverage_alone + pct_white + pct_married_households + 
+##     birth_rate
+## 
+##                             Df Sum of Sq     RSS   AIC
+## - study_per_cap              1        77 1190023 18056
+## - pct_white                  1       450 1190395 18057
+## &lt;none&gt;                                   1189946 18058
+## - pct_married_households     1      3480 1193426 18065
+## - median_age                 1      4079 1194025 18066
+## - pct_public_coverage_alone  1      4596 1194542 18067
+## - pct_unemployed16_over      1      5883 1195829 18071
+## - poverty_percent            1      6406 1196352 18072
+## - birth_rate                 1      6679 1196625 18073
+## - pct_hs25_over              1     24540 1214486 18117
+## - pct_bach_deg25_over        1     24814 1214760 18118
+## - incidence_rate             1    323708 1513654 18782
+## 
+## Step:  AIC=18056.01
+## target_death_rate ~ incidence_rate + poverty_percent + median_age + 
+##     pct_hs25_over + pct_bach_deg25_over + pct_unemployed16_over + 
+##     pct_public_coverage_alone + pct_white + pct_married_households + 
+##     birth_rate
+## 
+##                             Df Sum of Sq     RSS   AIC
+## - pct_white                  1       475 1190498 18055
+## &lt;none&gt;                                   1190023 18056
+## - pct_married_households     1      3417 1193440 18063
+## - median_age                 1      4057 1194079 18064
+## - pct_public_coverage_alone  1      4589 1194612 18066
+## - pct_unemployed16_over      1      5875 1195897 18069
+## - poverty_percent            1      6456 1196479 18070
+## - birth_rate                 1      6739 1196762 18071
+## - pct_hs25_over              1     24608 1214631 18116
+## - pct_bach_deg25_over        1     24941 1214963 18117
+## - incidence_rate             1    324533 1514555 18782
+## 
+## Step:  AIC=18055.22
+## target_death_rate ~ incidence_rate + poverty_percent + median_age + 
+##     pct_hs25_over + pct_bach_deg25_over + pct_unemployed16_over + 
+##     pct_public_coverage_alone + pct_married_households + birth_rate
+## 
+##                             Df Sum of Sq     RSS   AIC
+## &lt;none&gt;                                   1190498 18055
+## - pct_public_coverage_alone  1      4464 1194961 18064
+## - median_age                 1      4967 1195465 18066
+## - pct_married_households     1      5087 1195585 18066
+## - birth_rate                 1      6543 1197041 18070
+## - poverty_percent            1      6915 1197413 18071
+## - pct_unemployed16_over      1      7193 1197690 18071
+## - pct_hs25_over              1     24180 1214678 18114
+## - pct_bach_deg25_over        1     24853 1215351 18116
+## - incidence_rate             1    324321 1514819 18780</code></pre>
+<pre><code>## 
+## Call:
+## lm(formula = target_death_rate ~ incidence_rate + poverty_percent + 
+##     median_age + pct_hs25_over + pct_bach_deg25_over + pct_unemployed16_over + 
+##     pct_public_coverage_alone + pct_married_households + birth_rate, 
+##     data = select(can_reg_back, -binned_inc))
+## 
+## Coefficients:
+##               (Intercept)             incidence_rate  
+##                   89.3685                     0.1987  
+##           poverty_percent                 median_age  
+##                    0.4879                    -0.2838  
+##             pct_hs25_over        pct_bach_deg25_over  
+##                    0.6800                    -1.0706  
+##     pct_unemployed16_over  pct_public_coverage_alone  
+##                    0.6390                     0.3826  
+##    pct_married_households                 birth_rate  
+##                   -0.2718                    -0.7666</code></pre>
+<pre class="r"><code>##summary
+backward_2 = lm(target_death_rate ~ incidence_rate + poverty_percent + median_age + 
+    pct_hs25_over + pct_bach_deg25_over + pct_unemployed16_over + 
+    pct_public_coverage_alone + pct_married_households + birth_rate, data = can_reg_back)
+summary(backward_2)</code></pre>
+<pre><code>## 
+## Call:
+## lm(formula = target_death_rate ~ incidence_rate + poverty_percent + 
+##     median_age + pct_hs25_over + pct_bach_deg25_over + pct_unemployed16_over + 
+##     pct_public_coverage_alone + pct_married_households + birth_rate, 
+##     data = can_reg_back)
+## 
+## Residuals:
+##      Min       1Q   Median       3Q      Max 
+## -110.453  -11.667   -0.327   11.069  142.414 
+## 
+## Coefficients:
+##                            Estimate Std. Error t value Pr(&gt;|t|)    
+## (Intercept)               89.368498   8.957563   9.977  &lt; 2e-16 ***
+## incidence_rate             0.198723   0.006943  28.621  &lt; 2e-16 ***
+## poverty_percent            0.487937   0.116751   4.179 3.01e-05 ***
+## median_age                -0.283805   0.080127  -3.542 0.000403 ***
+## pct_hs25_over              0.679990   0.087010   7.815 7.54e-15 ***
+## pct_bach_deg25_over       -1.070637   0.135130  -7.923 3.24e-15 ***
+## pct_unemployed16_over      0.639037   0.149928   4.262 2.09e-05 ***
+## pct_public_coverage_alone  0.382581   0.113940   3.358 0.000796 ***
+## pct_married_households    -0.271776   0.075816  -3.585 0.000343 ***
+## birth_rate                -0.766608   0.188569  -4.065 4.92e-05 ***
+## ---
+## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+## 
+## Residual standard error: 19.9 on 3007 degrees of freedom
+## Multiple R-squared:  0.4869, Adjusted R-squared:  0.4854 
+## F-statistic: 317.1 on 9 and 3007 DF,  p-value: &lt; 2.2e-16</code></pre>
+<ul>
+<li>All variables are significant, and the adjusted R square is 0.4854</li>
+</ul>
+</div>
+<div id="model-validation-1" class="section level2">
+<h2>Model validation</h2>
+<pre class="r"><code>library(caret)
+#Use 10-fold validation and create the training sets
+data_train&lt;-trainControl(method=&quot;cv&quot;, number=10)
+# Fit the 4-variables model that we discussed in previous lectures
+model_caret&lt;-train(target_death_rate ~ incidence_rate + poverty_percent + median_age + 
+    pct_hs25_over + pct_bach_deg25_over + pct_unemployed16_over + 
+    pct_public_coverage_alone + pct_married_households + birth_rate,
+                   data=can_reg_back,
+                   trControl=data_train,
+                   method='lm',
+                   na.action=na.pass)
+  
+# Model predictions using 4 parts of the data fro training 
+model_caret</code></pre>
+<pre><code>## Linear Regression 
+## 
+## 3017 samples
+##    9 predictor
+## 
+## No pre-processing
+## Resampling: Cross-Validated (10 fold) 
+## Summary of sample sizes: 2714, 2716, 2715, 2715, 2717, 2714, ... 
+## Resampling results:
+## 
+##   RMSE     Rsquared   MAE     
+##   19.9087  0.4845851  14.89456
+## 
+## Tuning parameter 'intercept' was held constant at a value of TRUE</code></pre>
+<pre class="r"><code># Model coefficients
+model_caret$finalModel</code></pre>
+<pre><code>## 
+## Call:
+## lm(formula = .outcome ~ ., data = dat)
+## 
+## Coefficients:
+##               (Intercept)             incidence_rate  
+##                   89.3685                     0.1987  
+##           poverty_percent                 median_age  
+##                    0.4879                    -0.2838  
+##             pct_hs25_over        pct_bach_deg25_over  
+##                    0.6800                    -1.0706  
+##     pct_unemployed16_over  pct_public_coverage_alone  
+##                    0.6390                     0.3826  
+##    pct_married_households                 birth_rate  
+##                   -0.2718                    -0.7666</code></pre>
+<pre class="r"><code># Examine model prediction for each fold
+fold =model_caret$resample%&gt;%
+  as.tibble%&gt;%
+  mutate(MSE = RMSE^2)
+# look at the summary of MSE
+summary(fold$MSE)</code></pre>
+<pre><code>##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+##   333.9   361.3   384.3   398.0   412.8   507.6</code></pre>
 <pre class="r"><code>#mse of original model in the full dataset
 #lm(target_death_rate ~ binned_inc + poverty_percent + 
 #   study_per_cap + median_age + avg_household_size + pct_hs25_over + 

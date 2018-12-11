@@ -420,7 +420,7 @@ faraway::vif(lm(full_lm_filtered$call$formula))
 ```
 By removing the the median male age and the percent of individuals over 25 with only a high school education, we find that our VIF values are below 5. As we add in further variables, we'll have to watch this and make sure it stays below this level. It's a reasonable model with an $R^2_{adj}$ = `r can_reg_state_filtered_vif_reduced %>% summary() %>% .$adj.r.squared`.
 ```{r partialr2}
-plot(anova(full_lm_filtered), 'partial R2')
+#plot(anova(full_lm_filtered), 'partial R2')
 ```
 
 ```{r  elastic_net}
@@ -433,17 +433,17 @@ plot(anova(full_lm_filtered), 'partial R2')
 
 ```{r assumptions}
 #use covTest to get predictions
-#get residualsl
+#get residuals
 ```
 
 
 ```{r}
-can_reg_state <-
-can_reg_state %>% 
-  janitor::clean_names()
-can_reg_state_filtered <- can_reg_state %>% 
-  janitor::clean_names() %>% 
-dplyr::select( -pop_est2015, -med_income, -avg_ann_count, -avg_deaths_per_year, -median_age,        -pct_no_hs18_24, -pct_hs18_24, -pct_bach_deg18_24, -pct_some_col18_24,   -percent_married, -pct_employed16_over, -pct_private_coverage, -pct_private_coverage_alone, -pct_emp_priv_coverage, -pct_public_coverage, -pct_black, -pct_asian, -pct_other_race, -state_abb,  -county, -state, -geography)
+# can_reg_state <-
+# can_reg_state %>% 
+#   janitor::clean_names()
+# can_reg_state_filtered <- can_reg_state %>% 
+#   janitor::clean_names() %>% 
+# dplyr::select( -pop_est2015, -med_income, -avg_ann_count, -avg_deaths_per_year, -median_age,        -pct_no_hs18_24, -pct_hs18_24, -pct_bach_deg18_24, -pct_some_col18_24,   -percent_married, -pct_employed16_over, -pct_private_coverage, -pct_private_coverage_alone, -pct_emp_priv_coverage, -pct_public_coverage, -pct_black, -pct_asian, -pct_other_race, -state_abb,  -county, -state, -geography)
 
 ```
 

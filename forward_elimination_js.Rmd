@@ -17,7 +17,7 @@ can_reg = read.csv("Cancer_Registry.csv")
 #recode categorical variables 
 can_reg_omit = can_reg %>% 
   janitor::clean_names() %>% 
-  select( -pct_some_col18_24, -pct_no_hs18_24, -pct_hs18_24, -pct_bach_deg18_24, -avg_ann_count, -incidence_rate, -avg_deaths_per_year, -med_income, -pop_est2015, -median_age_male, -median_age_female, -percent_married, -pct_employed16_over, -pct_private_coverage, -pct_private_coverage_alone, -pct_emp_priv_coverage, -pct_public_coverage, -pct_black, -pct_asian, -pct_other_race) %>% 
+  select( -pct_some_col18_24, -pct_no_hs18_24, -pct_hs18_24, -pct_bach_deg18_24, -avg_ann_count, -avg_deaths_per_year, -med_income, -pop_est2015, -median_age_male, -median_age_female, -percent_married, -pct_employed16_over, -pct_private_coverage, -pct_private_coverage_alone, -pct_emp_priv_coverage, -pct_public_coverage, -pct_black, -pct_asian, -pct_other_race) %>% 
   filter(median_age < 100) %>% 
   select(geography, target_death_rate, binned_inc, everything()) %>% 
   na.omit() 
@@ -29,11 +29,10 @@ can_reg_omit = can_reg %>%
 
 ```{r}
 #define the upper limit of forward selection
-#since we have not decide how does binned income enter the model, 
-#so we firstly try modeling without binned income. 
+
 
 upper_fit = 
-  lm(target_death_rate ~ poverty_percent + study_per_cap + median_age + avg_household_size + pct_hs25_over + pct_bach_deg25_over + pct_unemployed16_over +pct_public_coverage_alone + pct_white + pct_married_households + birth_rate, data = can_reg_omit)
+  lm(target_death_rate ~ incidence_rate + binned_inc + poverty_percent + study_per_cap + median_age + avg_household_size + pct_hs25_over + pct_bach_deg25_over + pct_unemployed16_over +pct_public_coverage_alone + pct_white + pct_married_households + birth_rate, data = can_reg_omit)
 
 # forward selection based on AIC.
 fitstart = lm(target_death_rate ~1, data = can_reg_omit)
@@ -41,38 +40,40 @@ step(fitstart, direction = "forward", scope = formula(upper_fit))
 ```
 
 Forward selection gives the following model:
-`target_death_rate ~ pct_bach_deg25_over + pct_married_households + 
-    pct_hs25_over + pct_unemployed16_over + birth_rate + median_age + 
-    pct_public_coverage_alone + avg_household_size`
-which include 8 variables. 
+`target_death_rate ~ pct_bach_deg25_over + incidence_rate + 
+    binned_inc + pct_married_households + pct_hs25_over + pct_unemployed16_over +
+    median_age + birth_rate + pct_public_coverage_alone`
+which include 9 variables. 
 
 ```{r skim}
 can_reg_omit %>% 
-  select(pct_bach_deg25_over, pct_married_households, 
-    pct_hs25_over, pct_unemployed16_over, birth_rate, median_age, 
-    pct_public_coverage_alone, avg_household_size) %>% 
+  select(pct_bach_deg25_over , incidence_rate , 
+    binned_inc , pct_married_households , pct_hs25_over , pct_unemployed16_over ,
+    median_age , birth_rate , pct_public_coverage_alone) %>% 
   skimr::skim()
+
+boxplot(can_reg_omit$birth_rate)
+boxplot(can_reg_omit$pct_unemployed16_over)
 ```
-`birth_rate` is a little left-skewed. All other variables look fine. 
+`birth_rate` and `pct_unemployed16_over` are a little left-skewed. All other variables look fine. 
 
 ```{r diagonostic plot}
-forward1 = lm(formula = target_death_rate ~ pct_bach_deg25_over + pct_married_households + 
-    pct_hs25_over + pct_unemployed16_over + birth_rate + median_age + 
-    pct_public_coverage_alone + avg_household_size, data = can_reg_omit)
+forward1 = lm(formula = target_death_rate ~ pct_bach_deg25_over + incidence_rate + binned_inc + pct_married_households + pct_hs25_over + pct_unemployed16_over +
+    median_age + birth_rate + pct_public_coverage_alone, data = can_reg_omit)
 
 
 summary(forward1)
 plot(forward1)
 ```
-Though global F test on this model tells us that the model coefficients are significant, Adjusted R-squared is only 0.3465. **we might need to consider further adjustment or other models to get better goodness of fit.**
+Though global F test on this model tells us that the model coefficients are significant, Adjusted R-squared is only 0.4938.  **we might need to consider further adjustment or other models to get better goodness of fit.**
 
 Residuals V.S. Fitted : 
-- outliers 1211, 1355, 1478;
+- outliers 1211, 1355, 279;
 - scattered around 0. 
 
 QQ plot:
 - straight line in the middle region;
-- when standardized residuals are small or large, there is a slight deviation. 
+- when standardized residuals are small or large, there is a slight deviation. Slight deviation can be tolerated. 
 
 Scale-location:
 - generally in agreement with the Res VS Fitted plot; 
@@ -85,7 +86,7 @@ Residuals VS leverage:
 #check multicolinearity
 faraway::vif(forward1) %>% knitr::kable()
 ```
-All variables in this model have VIF less than 5. Generally good.
+All variables in this model have VIF less than 5 but `pct_bach_deg25_over` is a close call (VIF = 4.29). 
 
 
 ```{r Cross Validation}
@@ -97,14 +98,12 @@ cv_forward1 =
   crossv_mc(can_reg_omit, 10) %>% 
   mutate(train = map(train, as_tibble),
          test = map(test, as_tibble)) %>% 
-  mutate(model = map(train, ~lm(formula = target_death_rate ~ pct_bach_deg25_over + pct_married_households + 
-    pct_hs25_over + pct_unemployed16_over + birth_rate + median_age + 
-    pct_public_coverage_alone + avg_household_size, data = .x))) %>% 
+  mutate(model = map(train, ~lm(formula = target_death_rate ~ pct_bach_deg25_over + incidence_rate + binned_inc + pct_married_households + pct_hs25_over + pct_unemployed16_over + median_age + birth_rate + pct_public_coverage_alone, data = .x))) %>% 
   mutate(mse = map2_dbl(model, test, ~mse(model = .x, data = .y)))
 
 
-mean(cv_forward1$mse) #516.0276
-mse(model = forward1, data = can_reg_omit) #501.2589
+mean(cv_forward1$mse) #416.9129
+mse(model = forward1, data = can_reg_omit) #387.1092
 ```
 
-The MSE of test data is close to the MSE of the original (training) data.  
+The MSE of test data is close to the MSE of the original (training) data; percentage of difference is less than 10%. 

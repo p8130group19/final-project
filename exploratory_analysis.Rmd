@@ -12,7 +12,7 @@ library(glmnet)
 library(covTest)
 ```
 ```{r data_import}
-can_reg <- read_csv("Cancer_Registry.csv") 
+can_reg <- read_csv("Cancer_Registry_fixed.csv") 
   
 #this is the same file, but the n in Dona ana county has been changed to remove the n~ and allow processing.
 skimr::skim_with(numeric = list(hist = NULL,min = min,max = max,kurtosis = e1071::kurtosis,skewness = e1071::skewness,IQR = IQR,
@@ -94,6 +94,7 @@ educ<- lm(data = can_reg, as.formula(paste("TARGET_deathRate ~",paste(names(educ
 #str_c(names(education_cols),collapse = "")
 # educ<-lm(data = can_reg, formula =  target_DeathRate ~ PctNoHS18_24 + PctHS18_24 + PctSomeCol18_24 +
 #    PctBachDeg18_24 + PctHS25_Over + PctBachDeg25_Over)
+par(mfrow=c(2,2))
 plot(educ)
 ```
 the diagnostics look a bit imperfect. We'll recall that PctBachDeg18_24,  PctBachDeg25_Over, and PctNoHS18_24 were all skewed in distribution. We should apply a boxcox transformation to determine the correct transformations to take for each of these variables.
@@ -204,8 +205,12 @@ can_reg_joined <- can_reg_joined %>%
 }
 write_csv(x = can_reg_joined, path =   "can_reg_joined.csv")
 ```
+```{r write_arff}
+can_reg_arff <- can_reg_joined %>% mutate(binned_inc = as.numeric(as.factor(binned_inc))) %>% dplyr::select(-county,-geography, -state_abb) %>% mutate(state = as.numeric(as.factor(state))) %>% dplyr::select(everything(),target_death_rate)
+foreign::write.arff(x =  can_reg_arff, file = "can_reg_joinedv2.arff")
+```
 
-```{r pick_lambda_based_on_cv}
+```{r filter_spec_inc}
 #can_reg_joined
 can_reg_lasso <- glmnet(x = as.matrix(can_reg[,c(1,2,4:8,11:12,14:17,19:21,23:24,26:34)]),y = can_reg$TARGET_deathRate, alpha = 1)
 #X <- as.matrix(dat_state[,-4])
@@ -214,7 +219,7 @@ can_filt <- can_reg_joined %>%
     mutate(binned_inc = as.factor(binned_inc)) %>% 
   mutate(binned_inc = fct_reorder(.f = binned_inc,.x = med_income)) %>% 
 #  mutate()
-dplyr::select( -pct_some_col18_24, -pct_no_hs18_24, -pct_hs18_24, -pct_bach_deg18_24, -avg_ann_count,  -avg_deaths_per_year, -med_income, -pop_est2015, -median_age_male, -median_age_female, -percent_married, -pct_employed16_over, -pct_private_coverage, -pct_private_coverage_alone, -pct_emp_priv_coverage, -pct_public_coverage, -pct_black, -pct_asian, -pct_other_race, -state_abb, -incidence_rate, -county, -state, -geography)
+dplyr::select( -pop_est2015, -med_income, -avg_ann_count, -avg_deaths_per_year, -median_age,        -pct_no_hs18_24, -pct_hs18_24, -pct_bach_deg18_24,  -percent_married, -pct_employed16_over, -pct_private_coverage, -pct_private_coverage_alone, -pct_emp_priv_coverage, -pct_public_coverage, -pct_black, -pct_asian, -pct_other_race, -state_abb,  -county, -state, -geography)
 
 #which(sapply(can_filt,is.character))
 ```
@@ -242,12 +247,12 @@ ridge3<-glmnet(X, Y, alpha=0, lambda=best.lambda)
 res_ridge <- coef(ridge3) 
 res_ridge %>% as.matrix() %>% as.data.frame() %>% add_rownames() %>% as.tibble() %>% 
   mutate(abs_ridge = abs(s0)) %>% 
-  arrange(-abs_ridge)
-ridge3$dev.ratio
-#can_reg_lasso$beta %>% View
+  arrange(-abs_ridge) %>% knitr::kable()
 final_ridge<-ridge3
+final_ridge$dev.ratio
+#can_reg_lasso$beta %>% View
 ```
-Not surprisingly, the individual incidence rates tend to dominate the coefficients of the model. We'll try it out. Alternatively. We could use the top incidence rate per county as a factor and that may not overwhelm the model too much.  Besides these, the state region tends to be one of the largest predictors, as does the average household size and and the percent of married households. The dev ratio upon this run is 0.735. It does include some incidence data, so this may be somewhat expected.
+Not surprisingly, the individual incidence rates tend to dominate the coefficients of the model. We'll try it out. Alternatively. We could use the top incidence rate per county as a factor and that may not overwhelm the model too much.  Besides these, the state region tends to be one of the largest predictors, as does the average household size and and the percent of married households. The dev ratio upon this run is `r final_ridge$dev.ratio`. It does include some incidence data, so this may be somewhat expected.
 
 ```{r}
 cancer_names <- list.files("can_inc") %>% gsub(x = ., pattern = ".csv", replacement = "")
@@ -279,10 +284,11 @@ res_ridge <- coef(ridge3)
 res_ridge %>% as.matrix() %>% as.data.frame() %>% add_rownames() %>% as.tibble() %>% 
   mutate(abs_ridge = abs(s0)) %>% 
   arrange(-abs_ridge)
-ridge3$dev.ratio
 final_ridge_no_inc <- ridge3
+final_ridge_no_inc$dev.ratio
+
 ```
-As we take it out, we find that it gains a much lower importance in ridge regression. state_region tends to be the variable with the greatest importance, oddly. I would tend to include it in the final model, based on what we've seen here. Race, median age, and number of clinical trials tends to be several orders of magnitude below the education and employement variables... perhaps suggesting that the variance in Y may be better explained by direct employability measures like education and birth rate (which may be somewhat redundant with average household size). Dev ratio for this model, with a categorical variable for the most common cancer is 0.365, slightly below the adjusted R^2 of the full model after filtering.
+As we take it out, we find that it gains a much lower importance in ridge regression. state_region tends to be the variable with the greatest importance, oddly. I would tend to include it in the final model, based on what we've seen here. Race, median age, and number of clinical trials tends to be several orders of magnitude below the education and employement variables... perhaps suggesting that the variance in Y may be better explained by direct employability measures like education and birth rate (which may be somewhat redundant with average household size). Dev ratio for this model, with a categorical variable for the most common cancer is `r final_ridge_no_inc$dev.ratio`, slightly below the adjusted R^2 of the full model after filtering.
 ```{r lasso_regression}
 X = as.matrix(can_filt %>% dplyr::select(-target_death_rate, -brca, -uterine, -bladder, -ovary, -brca_cis, -cervix, -colorectal, -lungbronc, -melanoma, -ovary, -prostate) %>% sapply(as.numeric) %>% na.omit())
 #Y = na.omit(can_filt)$target_death_rate
@@ -308,14 +314,14 @@ best.lambda<-cv.out$lambda.min
 lasso2<- glmnet(X, Y, alpha =1, lambda=best.lambda)
 coef(lasso2) %>% as.matrix() %>% as.data.frame() %>% add_rownames() %>% as.tibble() %>% mutate(abs_s0 = abs(s0)) %>% arrange(-abs_s0)
 #coef(mult.fit)
-lasso2$dev.ratio
 final_lasso_no_inc <- lasso2
 plot(lasso1)
+final_lasso_no_inc$dev.ratio
 
 ```
-Utilizing lasso, we find that we have almost  precisely the same model. The dev ratio is nearly identical, at 0.3649.
+Utilizing lasso, we find that we have almost  precisely the same model. The dev ratio is nearly identical, at `r final_lasso_no_inc$dev.ratio`.
 
-With a dev ratio of 0.3649, this might be a reasonable model... but there may be far better ones from standard linear regression. We'll compare using R^2.  We'll perform the same selection of inital variables as before, or we'll have a fair number of counties ending up with missing data.
+With a dev ratio of `r final_lasso_no_inc$dev.ratio`, this might be a reasonable model... but there may be far better ones from standard linear regression. We'll compare using R^2.  We'll perform the same selection of inital variables as before, or we'll have a fair number of counties ending up with missing data.
 
 ```{r lm_comparison}
 #can_reg_state_copy <- can_reg_state
@@ -323,7 +329,7 @@ With a dev ratio of 0.3649, this might be a reasonable model... but there may be
 can_reg_state$state.region[can_reg_state$county=="District of Columbia"]<-"South"
 can_reg_state_filtered <- can_reg_state %>% 
   janitor::clean_names() %>% 
-dplyr::select( -pct_some_col18_24, -pct_no_hs18_24, -pct_hs18_24, -pct_bach_deg18_24, -avg_ann_count,  -avg_deaths_per_year, -med_income, -pop_est2015, -median_age_male, -median_age_female, -percent_married, -pct_employed16_over, -pct_private_coverage, -pct_private_coverage_alone, -pct_emp_priv_coverage, -pct_public_coverage, -pct_black, -pct_asian, -pct_other_race, -state_abb, -incidence_rate, -county, -state, -geography)
+dplyr::select( -pop_est2015, -med_income, -avg_ann_count, -avg_deaths_per_year, -median_age,        -pct_no_hs18_24, -pct_hs18_24, -pct_bach_deg18_24, -pct_some_col18_24,   -percent_married, -pct_employed16_over, -pct_private_coverage, -pct_private_coverage_alone, -pct_emp_priv_coverage, -pct_public_coverage, -pct_black, -pct_asian, -pct_other_race, -state_abb,  -county, -state, -geography)
 
 full_lm <- lm(data = can_reg_state, target_death_rate ~ .)
 can_reg_state_int_only <- lm(data = can_reg_state, target_death_rate ~ 0)
@@ -335,6 +341,7 @@ plot(full_lm_filtered)
 full_lm_filtered_summary <- summary(full_lm_filtered)
 full_lm_filtered_summary$r.squared
 full_lm_filtered_summary$adj.r.squared
+full_lm %>% summary() %>% .$r.squared
 full_lm %>% summary() %>% .$adj.r.squared
 ```
 We'll find that the lasso selected model only has a modest change (about 3%) to the adjusted R^2 from the full filtered model and may perform better on test data than the full model (may be less overfit). With absolutely no fitering, the R^2=1 and the adjusted R^2 cannot be calculated.
@@ -346,8 +353,9 @@ both_model <- stats::step(full_lm_filtered_int_only,scope = list(
 #which(is.na(can_reg_state$state.region))
 both_model$model
 both_model %>% summary()
+both_model %>% summary() %>% .$adj.r.squared
 ```
-Doing the both selection, we'll find there's a single missing value for state_region. It should be obvious how to correct this. It's the district of columbia. Considering the state above and below the district are both considered to be in the "South" level (2), we'll assign the same region to it. The adjusted R^2 is so high, we might suspect it's overfit.
+Doing the both selection, we'll find there's a single missing value for state_region. It should be obvious how to correct this. It's the district of columbia. Considering the state above and below the district are both considered to be in the "South" level (2), we'll assign the same region to it. The adjusted R^2 is so high ($R^2$ =`r both_model %>% summary() %>% .$adj.r.squared`), we might suspect it's overfit.
 We'll also try an exhaustive method using criteria for Cp and adjusted R^2.
 ```{r leaps, eval = F}
 #this crashes my R session. Moving on.
@@ -356,16 +364,67 @@ We'll also try an exhaustive method using criteria for Cp and adjusted R^2.
 
 ```
 ```{r lasso_diags}
-plotmo::plotres(final_lasso_no_inc) #still having a couple issues with these. Feel free to try a different package if these don't work well.
-plotmo::plotres(final_ridge_no_inc)
+#plotmo::plot_glmnet(final_lasso_no_inc, dev = "dev") #still having a couple issues with these. Feel free to try a different package if these don't work well.
+#plotmo::plot_glmnet(final_ridge_no_inc, xvar = "dev")
+#plot(final_ridge_no_inc, xvar = "lambda")
+par(mfrow = c(2,2))
 plot(full_lm_filtered)
+par(mfrow = c(2,2))
 plot(both_model)
+#https://web.stanford.edu/~hastie/glmnet/glmnet_alpha.html
+
 ```
 ```{r outliers}
-outlier_counties <- can_reg_state$county[c(1221,1336,1490)]
-can_reg_state[can_reg_state$MedianAge>100,] #median age no longer exists.
+#from "both" model and full model
+outlier_counties <- can_reg_state[c(1221,1336,282,2714,1059),c("state","county","pop_est2015")]
+outlier_counties %>% knitr::kable()
+
+#can_reg_state[can_reg_state$MedianAge > 100,] #median age no longer exists.
 #no influence points.
 
+```
+The above shows that there are a few potential outliers that might be driving the model are those in madison county, MS; williamsburg city, VA; Crowley County, CO; Phillips county, KS; and the Aleutians West Census Area, AK. Almost all of them except for Madison County, MS are very low in population and are a potential outlier due to this particular variable. The cooks distance does not suggest any influence points
+```{r vif, results='asis'}
+faraway::vif(full_lm_filtered) %>% sort(decreasing = T)
+faraway::vif(both_model) %>% sort(decreasing = T)
+```
+From the vif results, it seems as though the binned income is causing multicollinearity, as is having both median_age_male and median_age_female. Poverty Percent seems to be too highly related to income. At this point, we could remove one of the ages (male or female) and remove one of the income variables to see if this ameliorates the issue. A third option would be to do a PCA, as suggested in lecture 17.
+```{r}
+full_lm_filtered
+```
+
+```{r PCA}
+
+#ade4::dudi.pca(df = as.matrix(sapply(can_reg_state_filtered,as.numeric)))
+#FactoMineR::PCA( as.matrix(sapply(can_reg_state_filtered,as.numeric)))
+# FactoMineR::PCA( can_reg_state_filtered %>% mutate(state_region = as.numeric(state_region)) %>% mutate(binned_inc = as.numeric(binned_inc)))
+pca_can_reg_state_filtered <- stats::princomp(can_reg_state_filtered %>% mutate(state_region = as.numeric(state_region)) %>% mutate(binned_inc = as.numeric(as.factor(binned_inc))) %>% na.omit())
+plot(pca_can_reg_state_filtered)
+pca_can_reg_state_filtered$loadings
+#pca_can_reg_state_filtered$scores
+```
+If we look at the amount of variance explained by PC1 and look at the loadings, we'll find relationships among the variables. Among them, female and age male age tend to put their variance into the same bins utilizing the same variables. Incidence and the target variable go together,                                                                                                                                                                                                                                                                                                                                                                                                        
+```{r extra_pca, eval = F, echo = F}
+PCA_can_reg_state_filtered <- can_reg_state_filtered %>% mutate(state_region = as.numeric(state_region)) %>% mutate(binned_inc = as.numeric(as.factor(binned_inc))) %>% na.omit() %>% FactoMineR::PCA()
+#loadings <- PCA_can_reg_state_filtered$var$coord %>% as.data.frame()
+#loadings %>% add_rownames() %>% .[order(-loadings$Dim.1),]
+#prcomp_can_reg_state_filtered <- stats::prcomp(can_reg_state_filtered %>% mutate(state_region = as.numeric(state_region)) %>% mutate(binned_inc = as.numeric(as.factor(binned_inc))) %>% na.omit())
+#prcomp_can_reg_state_filtered$rotation %>% as.data.frame() %>% add_rownames() %>% as.tibble() %>% mutate(abs_PC1 = abs(PC1)) %>% arrange(abs_PC1)
+#plot(prcomp_can_reg_state_filtered)
+#plot(PCA_can_reg_state_filtered)
+
+```
+Following this, we'll notice that in the Variables Factor Map, we'll see that the median age variables follow each other precisely. We will proceed to remove them.  There are a lot of other relationships. Unemployment seems to have a similar vector to poverty and the percent of public coverage alone seems to be in the same magnitude and direction as the target.
+```{r multicollinearity_vif2}
+faraway::vif(full_lm_filtered)
+             can_reg_state_filtered %>% lm(data=.,formula = as.formula(paste0(  "target_death_rate ~ ", (can_reg_state_filtered %>% dplyr::select(-median_age_male, -binned_inc) %>% names() %>% paste0(collapse= " + ")),collapse=""))) %>% faraway::vif() %>% sort(decreasing = T)
+          can_reg_state_filtered_vif_reduced  <- can_reg_state_filtered %>% lm(data=.,formula = as.formula(paste0(  "target_death_rate ~ ", (can_reg_state_filtered %>% dplyr::select(-median_age_male, -binned_inc, -pct_hs25_over) %>% names() %>% paste0(collapse= " + ")),collapse="")))
+          can_reg_state_filtered_vif_reduced %>% summary() %>% .$adj.r.squared
+          can_reg_state_filtered_vif_reduced %>% faraway::vif() %>% sort(decreasing = T)
+```
+By removing the the median male age and the percent of individuals over 25 with only a high school education, we find that our VIF values are below 5. As we add in further variables, we'll have to watch this and make sure it stays below this level. It's a reasonable model with an $R^2_{adj}$ = `r can_reg_state_filtered_vif_reduced %>% summary() %>% .$adj.r.squared`.
+```{r partialr2}
+#plot(anova(full_lm_filtered), 'partial R2')
 ```
 
 ```{r  elastic_net}
@@ -378,10 +437,17 @@ can_reg_state[can_reg_state$MedianAge>100,] #median age no longer exists.
 
 ```{r assumptions}
 #use covTest to get predictions
-#get residualsl
+#get residuals
 ```
 
-```{r PCA}
+
+```{r}
+# can_reg_state <-
+# can_reg_state %>% 
+#   janitor::clean_names()
+# can_reg_state_filtered <- can_reg_state %>% 
+#   janitor::clean_names() %>% 
+# dplyr::select( -pop_est2015, -med_income, -avg_ann_count, -avg_deaths_per_year, -median_age,        -pct_no_hs18_24, -pct_hs18_24, -pct_bach_deg18_24, -pct_some_col18_24,   -percent_married, -pct_employed16_over, -pct_private_coverage, -pct_private_coverage_alone, -pct_emp_priv_coverage, -pct_public_coverage, -pct_black, -pct_asian, -pct_other_race, -state_abb,  -county, -state, -geography)
 
 ```
 

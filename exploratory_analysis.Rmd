@@ -219,7 +219,7 @@ can_filt <- can_reg_joined %>%
     mutate(binned_inc = as.factor(binned_inc)) %>% 
   mutate(binned_inc = fct_reorder(.f = binned_inc,.x = med_income)) %>% 
 #  mutate()
-dplyr::select( -pop_est2015, -med_income, -avg_ann_count, -avg_deaths_per_year, -median_age,        -pct_no_hs18_24, -pct_hs18_24, -pct_bach_deg18_24,  -percent_married, -pct_employed16_over, -pct_private_coverage, -pct_private_coverage_alone, -pct_emp_priv_coverage, -pct_public_coverage, -pct_black, -pct_asian, -pct_other_race, -state_abb,  -county, -state, -geography)
+dplyr::select( -pop_est2015, -med_income, -avg_ann_count, -avg_deaths_per_year, -median_age,        -pct_no_hs18_24, -pct_hs18_24, -pct_bach_deg18_24, -pct_some_col18_24,  -percent_married, -pct_employed16_over, -pct_private_coverage, -pct_private_coverage_alone, -pct_emp_priv_coverage, -pct_public_coverage, -pct_black, -pct_asian, -pct_other_race, -state_abb,  -county, -state, -geography)
 
 #which(sapply(can_filt,is.character))
 ```
@@ -448,6 +448,65 @@ By removing the the median male age and the percent of individuals over 25 with 
 # can_reg_state_filtered <- can_reg_state %>% 
 #   janitor::clean_names() %>% 
 # dplyr::select( -pop_est2015, -med_income, -avg_ann_count, -avg_deaths_per_year, -median_age,        -pct_no_hs18_24, -pct_hs18_24, -pct_bach_deg18_24, -pct_some_col18_24,   -percent_married, -pct_employed16_over, -pct_private_coverage, -pct_private_coverage_alone, -pct_emp_priv_coverage, -pct_public_coverage, -pct_black, -pct_asian, -pct_other_race, -state_abb,  -county, -state, -geography)
+
+```
+
+Given all the previous information, we'll attempt to combine the models now. Most of the variables are correlated with the predictor and according to lecture 21, slide  14, ridge should do better in this case. 
+
+```{r write_arff}
+can_reg_arff <- can_reg_joined %>% mutate(binned_inc = as.numeric(as.factor(binned_inc))) %>% dplyr::select(-county,-geography, -state_abb) %>% mutate(state = as.numeric(as.factor(state))) %>% dplyr::select(everything(),target_death_rate)
+foreign::write.arff(x =  can_reg_arff, file = "can_reg_joinedv2.arff")
+```
+
+```{r filter_spec_inc}
+#X <- as.matrix(dat_state[,-4])
+can_filt2 <- can_reg_joined %>% 
+  janitor::clean_names() %>% 
+    mutate(binned_inc = as.factor(binned_inc)) %>% 
+  mutate(binned_inc = fct_reorder(.f = binned_inc,.x = med_income)) %>% 
+#  mutate()
+dplyr::select( -pop_est2015, -med_income, -binned_inc, -avg_ann_count, -avg_deaths_per_year, -median_age,    -pct_hs25_over, -median_age_male,    -pct_no_hs18_24, -pct_hs18_24, -pct_bach_deg18_24, -pct_some_col18_24,  -percent_married, -pct_employed16_over, -pct_private_coverage, -pct_private_coverage_alone, -pct_emp_priv_coverage, -pct_public_coverage, -pct_black, -pct_asian, -pct_other_race, -state_abb,  -county, -state, -geography)
+
+#which(sapply(can_filt,is.character))
+```
+
+```{r lasso_with_redundant_removed}
+library(caret)
+X = as.matrix(can_filt %>% dplyr::select(-target_death_rate) %>% sapply(as.numeric) %>% na.omit())
+Y = na.omit(can_filt)$target_death_rate
+set.seed(1)
+
+train<-sample(1:nrow(X),nrow(X)/2)
+
+test<-(-train)
+
+Y.test<-Y[test]
+set.seed(2)
+doParallel::registerDoParallel()
+cv.out<-cv.glmnet(X[train,],Y[train], alpha=1,nfolds = 10, parallel = TRUE)
+plot(cv.out)
+best.lambda<-cv.out$lambda.min
+lasso.pred <- predict(cv.out,s=best.lambda,newx=X[test,])
+mean((lasso.pred-Y.test)^2) #MSE
+lasso3<-glmnet(X, Y, alpha=0, lambda=best.lambda)
+# res_lasso_ls<- cbind(coef(mult.fit),coef(lasso3))
+# colnames(res_lasso_ls) <- c("LS", "lasso")
+res_lasso <- coef(lasso3) 
+res_lasso %>% as.matrix() %>% as.data.frame() %>% add_rownames() %>% as.tibble() %>% 
+  mutate(abs_lasso = abs(s0)) %>% 
+  arrange(-abs_lasso) %>% knitr::kable()
+final_lasso_with_inc_reduced<-lasso3
+final_lasso_with_inc_reduced$dev.ratio
+```
+With the inflated variables removed and a new dev ratio of 
+```{r caret_cv}
+# data_train<-trainControl(method="cv", number=10)
+# model_caret<-train(X, Y,
+#   #                 data=can_filt2,
+#                    trControl=data_train,
+#                    method='glmnet',
+# #                   metric = "ROC",
+#                    na.action=na.pass)
 
 ```
 

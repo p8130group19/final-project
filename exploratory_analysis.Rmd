@@ -12,7 +12,7 @@ library(glmnet)
 library(covTest)
 ```
 ```{r data_import}
-can_reg <- read_csv("Cancer_Registry.csv") 
+can_reg <- read_csv("Cancer_Registry_fixed.csv") 
   
 #this is the same file, but the n in Dona ana county has been changed to remove the n~ and allow processing.
 skimr::skim_with(numeric = list(hist = NULL,min = min,max = max,kurtosis = e1071::kurtosis,skewness = e1071::skewness,IQR = IQR,
@@ -94,6 +94,7 @@ educ<- lm(data = can_reg, as.formula(paste("TARGET_deathRate ~",paste(names(educ
 #str_c(names(education_cols),collapse = "")
 # educ<-lm(data = can_reg, formula =  target_DeathRate ~ PctNoHS18_24 + PctHS18_24 + PctSomeCol18_24 +
 #    PctBachDeg18_24 + PctHS25_Over + PctBachDeg25_Over)
+par(mfrow=c(2,2))
 plot(educ)
 ```
 the diagnostics look a bit imperfect. We'll recall that PctBachDeg18_24,  PctBachDeg25_Over, and PctNoHS18_24 were all skewed in distribution. We should apply a boxcox transformation to determine the correct transformations to take for each of these variables.
@@ -204,8 +205,12 @@ can_reg_joined <- can_reg_joined %>%
 }
 write_csv(x = can_reg_joined, path =   "can_reg_joined.csv")
 ```
+```{r write_arff}
+can_reg_arff <- can_reg_joined %>% mutate(binned_inc = as.numeric(as.factor(binned_inc))) %>% dplyr::select(-county,-geography, -state_abb) %>% mutate(state = as.numeric(as.factor(state))) %>% dplyr::select(everything(),target_death_rate)
+foreign::write.arff(x =  can_reg_arff, file = "can_reg_joinedv2.arff")
+```
 
-```{r pick_lambda_based_on_cv}
+```{r filter_spec_inc}
 #can_reg_joined
 can_reg_lasso <- glmnet(x = as.matrix(can_reg[,c(1,2,4:8,11:12,14:17,19:21,23:24,26:34)]),y = can_reg$TARGET_deathRate, alpha = 1)
 #X <- as.matrix(dat_state[,-4])
@@ -214,7 +219,7 @@ can_filt <- can_reg_joined %>%
     mutate(binned_inc = as.factor(binned_inc)) %>% 
   mutate(binned_inc = fct_reorder(.f = binned_inc,.x = med_income)) %>% 
 #  mutate()
-dplyr::select( -pop_est2015, -med_income, -avg_ann_count, -avg_deaths_per_year, -median_age,        -pct_no_hs18_24, -pct_hs18_24, -pct_bach_deg18_24,   -percent_married, -pct_employed16_over, -pct_private_coverage, -pct_private_coverage_alone, -pct_emp_priv_coverage, -pct_public_coverage, -pct_black, -pct_asian, -pct_other_race, -state_abb,  -county, -state, -geography)
+dplyr::select( -pop_est2015, -med_income, -avg_ann_count, -avg_deaths_per_year, -median_age,        -pct_no_hs18_24, -pct_hs18_24, -pct_bach_deg18_24,  -percent_married, -pct_employed16_over, -pct_private_coverage, -pct_private_coverage_alone, -pct_emp_priv_coverage, -pct_public_coverage, -pct_black, -pct_asian, -pct_other_race, -state_abb,  -county, -state, -geography)
 
 #which(sapply(can_filt,is.character))
 ```
@@ -242,11 +247,10 @@ ridge3<-glmnet(X, Y, alpha=0, lambda=best.lambda)
 res_ridge <- coef(ridge3) 
 res_ridge %>% as.matrix() %>% as.data.frame() %>% add_rownames() %>% as.tibble() %>% 
   mutate(abs_ridge = abs(s0)) %>% 
-  arrange(-abs_ridge)
+  arrange(-abs_ridge) %>% knitr::kable()
 final_ridge<-ridge3
 final_ridge$dev.ratio
 #can_reg_lasso$beta %>% View
-
 ```
 Not surprisingly, the individual incidence rates tend to dominate the coefficients of the model. We'll try it out. Alternatively. We could use the top incidence rate per county as a factor and that may not overwhelm the model too much.  Besides these, the state region tends to be one of the largest predictors, as does the average household size and and the percent of married households. The dev ratio upon this run is `r final_ridge$dev.ratio`. It does include some incidence data, so this may be somewhat expected.
 
@@ -412,9 +416,9 @@ PCA_can_reg_state_filtered <- can_reg_state_filtered %>% mutate(state_region = a
 ```
 Following this, we'll notice that in the Variables Factor Map, we'll see that the median age variables follow each other precisely. We will proceed to remove them.  There are a lot of other relationships. Unemployment seems to have a similar vector to poverty and the percent of public coverage alone seems to be in the same magnitude and direction as the target.
 ```{r multicollinearity_vif2}
-faraway::vif(lm(full_lm_filtered$call$formula))
-             can_reg_state_filtered %>% lm(data=.,formula = as.formula(paste0(  "target_death_rate ~ ", (can_reg_state_filtered %>% select(-median_age_male, -binned_inc) %>% names() %>% paste0(collapse= " + ")),collapse=""))) %>% faraway::vif() %>% sort(decreasing = T)
-          can_reg_state_filtered_vif_reduced  <- can_reg_state_filtered %>% lm(data=.,formula = as.formula(paste0(  "target_death_rate ~ ", (can_reg_state_filtered %>% select(-median_age_male, -binned_inc, -pct_hs25_over) %>% names() %>% paste0(collapse= " + ")),collapse="")))
+faraway::vif(full_lm_filtered)
+             can_reg_state_filtered %>% lm(data=.,formula = as.formula(paste0(  "target_death_rate ~ ", (can_reg_state_filtered %>% dplyr::select(-median_age_male, -binned_inc) %>% names() %>% paste0(collapse= " + ")),collapse=""))) %>% faraway::vif() %>% sort(decreasing = T)
+          can_reg_state_filtered_vif_reduced  <- can_reg_state_filtered %>% lm(data=.,formula = as.formula(paste0(  "target_death_rate ~ ", (can_reg_state_filtered %>% dplyr::select(-median_age_male, -binned_inc, -pct_hs25_over) %>% names() %>% paste0(collapse= " + ")),collapse="")))
           can_reg_state_filtered_vif_reduced %>% summary() %>% .$adj.r.squared
           can_reg_state_filtered_vif_reduced %>% faraway::vif() %>% sort(decreasing = T)
 ```

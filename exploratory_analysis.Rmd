@@ -466,14 +466,14 @@ can_filt2 <- can_reg_joined %>%
   mutate(binned_inc = fct_reorder(.f = binned_inc,.x = med_income)) %>% 
 #  mutate()
 dplyr::select( -pop_est2015, -med_income, -binned_inc, -avg_ann_count, -avg_deaths_per_year, -median_age,    -pct_hs25_over, -median_age_male,    -pct_no_hs18_24, -pct_hs18_24, -pct_bach_deg18_24, -pct_some_col18_24,  -percent_married, -pct_employed16_over, -pct_private_coverage, -pct_private_coverage_alone, -pct_emp_priv_coverage, -pct_public_coverage, -pct_black, -pct_asian, -pct_other_race, -state_abb,  -county, -state, -geography)
-
+can_filt2$top_can <- apply(can_filt2[,cancer_names],1,which.max) %>% map(.x = ., .f = ~ifelse(length(.)==0,"none",cancer_names[.])) %>% unlist() %>% as.factor()
+can_filt2 <- can_filt2 %>% dplyr::select(-cancer_names)
 #which(sapply(can_filt,is.character))
 ```
 
 ```{r lasso_with_redundant_removed}
-library(caret)
-X = as.matrix(can_filt %>% dplyr::select(-target_death_rate) %>% sapply(as.numeric) %>% na.omit())
-Y = na.omit(can_filt)$target_death_rate
+X = as.matrix(can_filt2 %>% dplyr::select(-target_death_rate) %>% sapply(as.numeric) %>% na.omit())
+Y = na.omit(can_filt2)$target_death_rate
 set.seed(1)
 
 train<-sample(1:nrow(X),nrow(X)/2)
@@ -483,12 +483,12 @@ test<-(-train)
 Y.test<-Y[test]
 set.seed(2)
 doParallel::registerDoParallel()
-cv.out<-cv.glmnet(X[train,],Y[train], alpha=1,nfolds = 10, parallel = TRUE)
+cv.out<-cv.glmnet(scale(X[train,]),scale(Y[train]), alpha=1,nfolds = 10, parallel = TRUE, lambda = grid)
 plot(cv.out)
 best.lambda<-cv.out$lambda.min
 lasso.pred <- predict(cv.out,s=best.lambda,newx=X[test,])
 mean((lasso.pred-Y.test)^2) #MSE
-lasso3<-glmnet(X, Y, alpha=0, lambda=best.lambda)
+lasso3<-glmnet(X, Y, alpha=1, lambda=best.lambda)
 # res_lasso_ls<- cbind(coef(mult.fit),coef(lasso3))
 # colnames(res_lasso_ls) <- c("LS", "lasso")
 res_lasso <- coef(lasso3) 

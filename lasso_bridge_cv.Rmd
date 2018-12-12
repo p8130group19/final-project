@@ -1,0 +1,50 @@
+---
+title: "lasso_bridge_cv"
+author: "pc2853"
+date: "December 11, 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(dplyr)
+library(faraway)
+library(MASS)                           # for lm.ridge()
+library(glmnet)                         # for glmnet()
+library(dplyr)
+library(reshape2)
+library(ggplot2)
+library(caret)
+```
+
+```{r load data}
+load("modeling5_fixed_lasso_added.RData")
+coef(final_lasso_with_inc_reduced)
+```
+
+model diagnosis for lasso model:
+The estimates are all really small and the pct_back_deg25_over and state_region are relatively a little bit larger. Since the lasso model already ran the cross validation to choose the lambda value that corrresponding to the least MSE, I do not know if it is necessary to re-fit a linear regression model and produce its mse. But the code for that is below. 
+
+```{r}
+library(caret)
+#Use 10-fold validation and create the training sets
+data_train<-trainControl(method="cv", number=10)
+
+model_caret<-train(target_death_rate ~ incidence_rate + poverty_percent + study_per_cap + median_age_female + avg_household_size  + pct_bach_deg25_over + pct_unemployed16_over  +pct_public_coverage_alone +pct_white  +pct_married_households +birth_rate +state_region +top_can,
+                   data=can_filt2,
+                   trControl=data_train,
+                   method='lm',
+                   na.action=na.pass)
+  
+
+model_caret
+
+model_caret$finalModel
+fold =model_caret$resample%>%
+  as.tibble%>%
+  mutate(MSE = RMSE^2)
+
+summary(fold$MSE)
+
+```
+

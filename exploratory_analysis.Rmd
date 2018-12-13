@@ -253,6 +253,7 @@ final_ridge<-ridge3
 final_ridge$dev.ratio
 final_ridge_range<-glmnet(X, Y, alpha=0, lambda=grid)
 plotmo::plot_glmnet(final_ridge_range,xvar = c())
+plotmo::plotres(final_ridge_range)
 #can_reg_lasso$beta %>% View
 ```
 
@@ -278,7 +279,26 @@ colnames(X)[ridge_cov_test$results[ridge_cov_test$results[,3]<0.05,1]] #not sure
 #not sure if we can even note this.
 faraway::vif(lm(data=can_filt,target_death_rate ~ .)) %>% as.data.frame() %>% add_rownames() %>% as.tibble() %>% View()
 #Mahanolobis distance.
+# m_dist <- mahalanobis(X, colMeans(X), cov(X))
+# XMD <- round(m_dist, 1)
+
+# Binary Outlier Variable
+# XMD$outlier <- "No"
+# XMD$outlier[XMD > 20] <- "Yes"    # Threshold set to 20
+ mdist_outliers<- chemometrics::Moutlier(X)
+#which(mdist_outliers$rd>30)
+outlier_counties <- can_reg_state[which(mdist_outliers$rd>30),c("state","county","pop_est2015")]
+outlier_counties %>% knitr::kable()
+
 ```
+```{r linearity}
+GGally::ggpairs(can_filt)
+#pairs(can_filt)
+foreach(i = 2:ncol(can_filt)) %do%
+{plot(can_filt[["target_death_rate"]],can_filt %>% pull(i))
+}
+```
+
 ```{r diagnotic_plots_ridge}
 
 plotmo::plot_glmnet(final_ridge_range,label = T,s = best.lambda, xvar = "rlambda")

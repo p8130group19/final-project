@@ -252,8 +252,7 @@ res_ridge %>% as.matrix() %>% as.data.frame() %>% add_rownames() %>% as.tibble()
 final_ridge<-ridge3
 final_ridge$dev.ratio
 final_ridge_range<-glmnet(X, Y, alpha=0, lambda=grid)
-plotmo::plot_glmnet(final_ridge_range,xvar = c())
-plotmo::plotres(final_ridge_range)
+#plotmo::plot_glmnet(final_ridge_range,xvar = c())
 #can_reg_lasso$beta %>% View
 ```
 
@@ -305,6 +304,7 @@ plotmo::plot_glmnet(final_ridge_range,label = T,s = best.lambda, xvar = "rlambda
 plotmo::plot_glmnet(final_ridge_range,label = T,s = best.lambda, xvar = "lambda")
 plotmo::plot_glmnet(final_ridge_range,label = T,s = best.lambda, xvar = "norm")
 plotmo::plot_glmnet(final_ridge_range,label = T,s = best.lambda, xvar = "dev")
+plotmo::plotres(final_ridge_range)
 
 ```
 

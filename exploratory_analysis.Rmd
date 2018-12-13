@@ -212,14 +212,14 @@ foreign::write.arff(x =  can_reg_arff, file = "can_reg_joinedv2.arff")
 
 ```{r filter_spec_inc}
 #can_reg_joined
-can_reg_lasso <- glmnet(x = as.matrix(can_reg[,c(1,2,4:8,11:12,14:17,19:21,23:24,26:34)]),y = can_reg$TARGET_deathRate, alpha = 1)
+# can_reg_lasso <- glmnet(x = as.matrix(can_reg[,c(1,2,4:8,11:12,14:17,19:21,23:24,26:34)]),y = can_reg$TARGET_deathRate, alpha = 1)
 #X <- as.matrix(dat_state[,-4])
 can_filt <- can_reg_joined %>% 
   janitor::clean_names() %>% 
     mutate(binned_inc = as.factor(binned_inc)) %>% 
   mutate(binned_inc = fct_reorder(.f = binned_inc,.x = med_income)) %>% 
 #  mutate()
-dplyr::select( -pop_est2015, -med_income, -avg_ann_count, -avg_deaths_per_year, -median_age,        -pct_no_hs18_24, -pct_hs18_24, -pct_bach_deg18_24, -pct_some_col18_24,  -percent_married, -pct_employed16_over, -pct_private_coverage, -pct_private_coverage_alone, -pct_emp_priv_coverage, -pct_public_coverage, -pct_black, -pct_asian, -pct_other_race, -state_abb,  -county, -state, -geography)
+dplyr::select( -pop_est2015, -med_income, -avg_ann_count, -avg_deaths_per_year, -median_age, -median_age_male,        -pct_no_hs18_24, -pct_hs18_24, -pct_bach_deg18_24, -pct_some_col18_24,  -percent_married, -pct_employed16_over, -pct_private_coverage, -pct_private_coverage_alone, -pct_emp_priv_coverage, -pct_public_coverage, -pct_black, -pct_asian, -pct_other_race, -state_abb,  -county, -state, -geography, -binned_inc)
 
 #which(sapply(can_filt,is.character))
 ```
@@ -241,18 +241,53 @@ plot(cv.out)
 best.lambda<-cv.out$lambda.min
 ridge.pred <- predict(cv.out,s=best.lambda,newx=X[test,])
 mean((ridge.pred-Y.test)^2) #MSE
-ridge3<-glmnet(X, Y, alpha=0, lambda=best.lambda)
+final_ridge<-glmnet(X, Y, alpha=0, lambda=best.lambda)
+
 # res_ridge_ls<- cbind(coef(mult.fit),coef(ridge3))
 # colnames(res_ridge_ls) <- c("LS", "Ridge")
-res_ridge <- coef(ridge3) 
+res_ridge <- coef(final_ridge) 
 res_ridge %>% as.matrix() %>% as.data.frame() %>% add_rownames() %>% as.tibble() %>% 
   mutate(abs_ridge = abs(s0)) %>% 
   arrange(-abs_ridge) %>% knitr::kable()
 final_ridge<-ridge3
 final_ridge$dev.ratio
+final_ridge_range<-glmnet(X, Y, alpha=0, lambda=grid)
+plotmo::plot_glmnet(final_ridge_range,xvar = c())
 #can_reg_lasso$beta %>% View
 ```
+
 Not surprisingly, the individual incidence rates tend to dominate the coefficients of the model. We'll try it out. Alternatively. We could use the top incidence rate per county as a factor and that may not overwhelm the model too much.  Besides these, the state region tends to be one of the largest predictors, as does the average household size and and the percent of married households. The dev ratio upon this run is `r final_ridge$dev.ratio`. It does include some incidence data, so this may be somewhat expected.
+
+```{r glmnet_vif}
+
+#car::vif(lm(data=can_filt,target_death_rate ~ .))
+faraway::vif(lm(data=can_filt,target_death_rate ~ .)) %>% as.data.frame() %>% add_rownames() %>% as.tibble() %>% View()
+
+```
+```{r data_exploration_with_ridge_model}
+can_filt %>% na.omit() %>% pull(state_region) %>% table()
+
+```
+```{r ridge_covtest}
+#runs elastic net and then a covTest on top.
+ridge_cov_test <-covTest::covTest(lars.en(x=X,y=Y,lambda2=best.lambda),x=X,y=Y)
+colnames(X)[ridge_cov_test$results[ridge_cov_test$results[,3]<0.05,1]] #not sure how to interpret this, but herre are the significant factors. Best not to limit the paper to just these.
+```
+
+```{r ridge_outliers}
+#not sure if we can even note this.
+faraway::vif(lm(data=can_filt,target_death_rate ~ .)) %>% as.data.frame() %>% add_rownames() %>% as.tibble() %>% View()
+#Mahanolobis distance.
+```
+```{r diagnotic_plots_ridge}
+
+plotmo::plot_glmnet(final_ridge_range,label = T,s = best.lambda, xvar = "rlambda")
+plotmo::plot_glmnet(final_ridge_range,label = T,s = best.lambda, xvar = "lambda")
+plotmo::plot_glmnet(final_ridge_range,label = T,s = best.lambda, xvar = "norm")
+plotmo::plot_glmnet(final_ridge_range,label = T,s = best.lambda, xvar = "dev")
+
+```
+
 
 ```{r}
 cancer_names <- list.files("can_inc") %>% gsub(x = ., pattern = ".csv", replacement = "")
@@ -507,6 +542,151 @@ With the inflated variables removed and a new dev ratio of
 #                    method='glmnet',
 # #                   metric = "ROC",
 #                    na.action=na.pass)
+```
+```{r}
+#incidence rate by region 
+#summary table for every variable.
+# can_filt %>% 
+#   group_by_all(state_region, mean)  
+  
+
+```
+```{r plotting_diags}
+plotmo::plotres(final_ridge)
+
+object=final_ridge
+ plotres<-  function (object = stop("no 'object' argument"), which = 1:4, 
+    info = FALSE, versus = 1, standardize = FALSE, delever = FALSE, 
+    level = 0, id.n = 3, labels.id = NULL, smooth.col = 2, grid.col = 0, 
+    jitter = 0, do.par = NULL, caption = NULL, trace = 0, npoints = 3000, 
+    center = TRUE, type = NULL, nresponse = NA, object.name = quote.deparse(substitute(object)), 
+    ...) 
+{
+    plotmo:::init.global.data()
+    on.exit({
+        init.global.data()
+        gc()
+    })
+    object
+    trace <- as.numeric(check.integer.scalar(trace, logical.ok = TRUE))
+    attr(object, ".Environment") <- get.model.env(object, object.name, 
+        trace)
+    temp <- plotmo_prolog(object, object.name, trace, ...)
+    object <- temp$object
+    my.call <- temp$my.call
+    if (!is.numeric(which) || !is.vector(which) || anyNA(which) || 
+        any(which != floor(which)) || any(which < 1) || any(which > 
+        W9LOGLOG)) 
+        which.err()
+    info <- check.boolean(info)
+    standardize <- check.boolean(standardize)
+    delever <- check.boolean(delever)
+    level <- check.level.arg(level, zero.ok = TRUE)
+    smooth.col <- get.smooth.col(smooth.col, ...)
+    grid.col <- dota("col.grid", DEF = grid.col, ...)
+    if (is.specified(grid.col) && is.logical(grid.col) && grid.col) 
+        grid.col <- "lightgray"
+    check.integer.scalar(nresponse, min = 1, na.ok = TRUE, logical.ok = FALSE, 
+        char.ok = TRUE)
+    temp <- get.plotres.data(object, object.name, which, standardize, 
+        delever, level, versus, id.n, labels.id, trace, npoints, 
+        type, nresponse, ...)
+    nresponse <- temp$nresponse
+    resp.name <- temp$resp.name
+    type <- temp$type
+    rinfo <- temp$rinfo
+    vinfo <- temp$vinfo
+    fitted <- temp$fitted
+    which <- temp$vinfo$which
+    id.n <- temp$id.n
+    npoints <- temp$npoints
+    rsq <- temp$rsq
+    possible.biglm.warning(object, trace)
+    nfigs <- length(which) * length(vinfo$icolumns)
+    if (nfigs == 0) {
+        if (trace >= 0) 
+            warning0("plotres: nothing to plot")
+        return(invisible(NULL))
+    }
+    do.par <- check.do.par(do.par, nfigs)
+    caption <- get.caption(nfigs, do.par, caption, resp.name, 
+        type, getCall(object), object.name, my.call)
+    if (do.par) {
+        oldpar <- par(no.readonly = TRUE)
+        do.par(nfigs = nfigs, caption = caption, main1 = NA, 
+            xlab1 = dota("xlab", DEF = NULL, ...), ylab1 = dota("ylab", 
+                DEF = NULL, ...), trace = trace, nlines.in.main = nlines.in.plotres.main(object = object, 
+                which = which, versus = versus, standardize = standardize, 
+                delever = delever, level = level, ...), def.font.main = 1, 
+            ...)
+        if (do.par == 1) 
+            on.exit(par(oldpar), add = TRUE)
+    }
+    else {
+        oldpar <- do.par.dots(..., trace = trace)
+        if (length(oldpar)) 
+            on.exit(do.call(par, oldpar), add = TRUE)
+    }
+    force.auto.resids.xlim <- length(which) > 1 && (W1 %in% which) && 
+        inherits(object, "earth") && !is.dot("w1.xlim", ...)
+    force.auto.resids.ylim <- length(which) > 1 && (W1 %in% which) && 
+        inherits(object, "earth") && !is.dot("w1.ylim", ...)
+    w1.retval <- list(plotted = FALSE, retval = NULL)
+    w3.retval <- NULL
+    attempted.w1.plot <- FALSE
+    if (any(which == W1)) {
+        w1.retval <- plot_w1(object = object, which = which, 
+            info = info, standardize = standardize, delever = delever, 
+            level = level, versus = versus, id.n = id.n, labels.id = rinfo$labs, 
+            smooth.col = smooth.col, grid.col = grid.col, do.par = do.par, 
+            caption = if (all(which == W1)) 
+                caption
+            else "", trace = trace, npoints = npoints, center = center, 
+            type = type, nresponse = nresponse, object.name = object.name, 
+            ...)
+        attempted.w1.plot <- TRUE
+        which <- which[which != W1]
+        if (length(which) == 0 && !w1.retval$plotted && trace >= 
+            0) 
+            warning0("plotres: nothing to plot")
+    }
+    if (length(which) == 0) 
+        return(invisible(if (attempted.w1.plot) w1.retval$retval else w3.retval))
+    if (is.null(rinfo$labs)) 
+        rinfo$labs <- paste(1:length(rinfo$resids))
+    iresids <- get.isubset(rinfo$resids, npoints, id.n, use.all = (vinfo$nversus == 
+        V4LEVER), rinfo$scale)
+    xlim <- dota("xlim", DEF = NULL, ...)
+    for (icolumn in vinfo$icolumns) {
+        for (iwhich in seq_along(which)) {
+            if (which[iwhich] == W2CUM) 
+                plotmo_cum(rinfo = rinfo, info = info, nfigs = nfigs, 
+                  add = FALSE, cum.col1 = NA, grid.col = grid.col, 
+                  jitter = 0, ...)
+            else if (which[iwhich] == W4QQ) 
+                plotmo_qq(rinfo = rinfo, info = info, nfigs = nfigs, 
+                  grid.col = grid.col, smooth.col = smooth.col, 
+                  id.n = id.n, iresids = iresids, npoints = npoints, 
+                  force.auto.resids.ylim = force.auto.resids.ylim, 
+                  ...)
+            else w3.retval <- plotresids(object = object, which = which[iwhich], 
+                info = info, standardize = standardize, level = level, 
+                versus1 = vinfo$versus.mat[, icolumn], id.n = id.n, 
+                smooth.col = smooth.col, grid.col = grid.col, 
+                jitter = jitter, npoints = npoints, center = center, 
+                type = type, fitted = fitted, rinfo = rinfo, 
+                rsq = rsq, iresids = iresids, nversus = vinfo$nversus, 
+                colname.versus1 = colnames(vinfo$versus.mat)[icolumn], 
+                force.auto.resids.xlim = force.auto.resids.xlim, 
+                force.auto.resids.ylim = force.auto.resids.ylim, 
+                ...)
+        }
+    }
+    draw.caption(caption, ...)
+    if (trace >= 1) 
+        printf("\ntraining rsq %.2f\n", rsq)
+    invisible(if (attempted.w1.plot) w1.retval$retval else w3.retval)
+}
 
 ```
 

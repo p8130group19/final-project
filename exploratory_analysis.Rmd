@@ -571,142 +571,70 @@ With the inflated variables removed and a new dev ratio of
   
 
 ```
-```{r plotting_diags}
-plotmo::plotres(final_ridge)
-
-object=final_ridge
- plotres<-  function (object = stop("no 'object' argument"), which = 1:4, 
-    info = FALSE, versus = 1, standardize = FALSE, delever = FALSE, 
-    level = 0, id.n = 3, labels.id = NULL, smooth.col = 2, grid.col = 0, 
-    jitter = 0, do.par = NULL, caption = NULL, trace = 0, npoints = 3000, 
-    center = TRUE, type = NULL, nresponse = NA, object.name = quote.deparse(substitute(object)), 
-    ...) 
-{
-    plotmo:::init.global.data()
-    on.exit({
-        init.global.data()
-        gc()
-    })
-    object
-    trace <- as.numeric(check.integer.scalar(trace, logical.ok = TRUE))
-    attr(object, ".Environment") <- get.model.env(object, object.name, 
-        trace)
-    temp <- plotmo_prolog(object, object.name, trace, ...)
-    object <- temp$object
-    my.call <- temp$my.call
-    if (!is.numeric(which) || !is.vector(which) || anyNA(which) || 
-        any(which != floor(which)) || any(which < 1) || any(which > 
-        W9LOGLOG)) 
-        which.err()
-    info <- check.boolean(info)
-    standardize <- check.boolean(standardize)
-    delever <- check.boolean(delever)
-    level <- check.level.arg(level, zero.ok = TRUE)
-    smooth.col <- get.smooth.col(smooth.col, ...)
-    grid.col <- dota("col.grid", DEF = grid.col, ...)
-    if (is.specified(grid.col) && is.logical(grid.col) && grid.col) 
-        grid.col <- "lightgray"
-    check.integer.scalar(nresponse, min = 1, na.ok = TRUE, logical.ok = FALSE, 
-        char.ok = TRUE)
-    temp <- get.plotres.data(object, object.name, which, standardize, 
-        delever, level, versus, id.n, labels.id, trace, npoints, 
-        type, nresponse, ...)
-    nresponse <- temp$nresponse
-    resp.name <- temp$resp.name
-    type <- temp$type
-    rinfo <- temp$rinfo
-    vinfo <- temp$vinfo
-    fitted <- temp$fitted
-    which <- temp$vinfo$which
-    id.n <- temp$id.n
-    npoints <- temp$npoints
-    rsq <- temp$rsq
-    possible.biglm.warning(object, trace)
-    nfigs <- length(which) * length(vinfo$icolumns)
-    if (nfigs == 0) {
-        if (trace >= 0) 
-            warning0("plotres: nothing to plot")
-        return(invisible(NULL))
-    }
-    do.par <- check.do.par(do.par, nfigs)
-    caption <- get.caption(nfigs, do.par, caption, resp.name, 
-        type, getCall(object), object.name, my.call)
-    if (do.par) {
-        oldpar <- par(no.readonly = TRUE)
-        do.par(nfigs = nfigs, caption = caption, main1 = NA, 
-            xlab1 = dota("xlab", DEF = NULL, ...), ylab1 = dota("ylab", 
-                DEF = NULL, ...), trace = trace, nlines.in.main = nlines.in.plotres.main(object = object, 
-                which = which, versus = versus, standardize = standardize, 
-                delever = delever, level = level, ...), def.font.main = 1, 
-            ...)
-        if (do.par == 1) 
-            on.exit(par(oldpar), add = TRUE)
-    }
-    else {
-        oldpar <- do.par.dots(..., trace = trace)
-        if (length(oldpar)) 
-            on.exit(do.call(par, oldpar), add = TRUE)
-    }
-    force.auto.resids.xlim <- length(which) > 1 && (W1 %in% which) && 
-        inherits(object, "earth") && !is.dot("w1.xlim", ...)
-    force.auto.resids.ylim <- length(which) > 1 && (W1 %in% which) && 
-        inherits(object, "earth") && !is.dot("w1.ylim", ...)
-    w1.retval <- list(plotted = FALSE, retval = NULL)
-    w3.retval <- NULL
-    attempted.w1.plot <- FALSE
-    if (any(which == W1)) {
-        w1.retval <- plot_w1(object = object, which = which, 
-            info = info, standardize = standardize, delever = delever, 
-            level = level, versus = versus, id.n = id.n, labels.id = rinfo$labs, 
-            smooth.col = smooth.col, grid.col = grid.col, do.par = do.par, 
-            caption = if (all(which == W1)) 
-                caption
-            else "", trace = trace, npoints = npoints, center = center, 
-            type = type, nresponse = nresponse, object.name = object.name, 
-            ...)
-        attempted.w1.plot <- TRUE
-        which <- which[which != W1]
-        if (length(which) == 0 && !w1.retval$plotted && trace >= 
-            0) 
-            warning0("plotres: nothing to plot")
-    }
-    if (length(which) == 0) 
-        return(invisible(if (attempted.w1.plot) w1.retval$retval else w3.retval))
-    if (is.null(rinfo$labs)) 
-        rinfo$labs <- paste(1:length(rinfo$resids))
-    iresids <- get.isubset(rinfo$resids, npoints, id.n, use.all = (vinfo$nversus == 
-        V4LEVER), rinfo$scale)
-    xlim <- dota("xlim", DEF = NULL, ...)
-    for (icolumn in vinfo$icolumns) {
-        for (iwhich in seq_along(which)) {
-            if (which[iwhich] == W2CUM) 
-                plotmo_cum(rinfo = rinfo, info = info, nfigs = nfigs, 
-                  add = FALSE, cum.col1 = NA, grid.col = grid.col, 
-                  jitter = 0, ...)
-            else if (which[iwhich] == W4QQ) 
-                plotmo_qq(rinfo = rinfo, info = info, nfigs = nfigs, 
-                  grid.col = grid.col, smooth.col = smooth.col, 
-                  id.n = id.n, iresids = iresids, npoints = npoints, 
-                  force.auto.resids.ylim = force.auto.resids.ylim, 
-                  ...)
-            else w3.retval <- plotresids(object = object, which = which[iwhich], 
-                info = info, standardize = standardize, level = level, 
-                versus1 = vinfo$versus.mat[, icolumn], id.n = id.n, 
-                smooth.col = smooth.col, grid.col = grid.col, 
-                jitter = jitter, npoints = npoints, center = center, 
-                type = type, fitted = fitted, rinfo = rinfo, 
-                rsq = rsq, iresids = iresids, nversus = vinfo$nversus, 
-                colname.versus1 = colnames(vinfo$versus.mat)[icolumn], 
-                force.auto.resids.xlim = force.auto.resids.xlim, 
-                force.auto.resids.ylim = force.auto.resids.ylim, 
-                ...)
-        }
-    }
-    draw.caption(caption, ...)
-    if (trace >= 1) 
-        printf("\ntraining rsq %.2f\n", rsq)
-    invisible(if (attempted.w1.plot) w1.retval$retval else w3.retval)
-}
+```{r}
+can_filt3 <- can_reg_joined %>% 
+  janitor::clean_names() %>% 
+    mutate(binned_inc = as.factor(binned_inc)) %>% 
+  mutate(binned_inc = fct_reorder(.f = binned_inc,.x = med_income)) 
+#add_top_can
+can_filt3$top_can <- apply(can_filt[,cancer_names],1,which.max) %>% map(.x = ., .f = ~ifelse(length(.)==0,"none",cancer_names[.])) %>% unlist() %>% as.factor()
+#apply(can_filt[,cancer_names],1,which.max) %>% unlist() %>% table() %>% names(.) %>% as.numeric() %>% cancer_names[.]
+can_filt3 <- can_filt3 %>% 
+#  mutate()
+dplyr::select( -pop_est2015, -med_income, -avg_ann_count, -avg_deaths_per_year, -median_age, -median_age_male,        -pct_no_hs18_24, -pct_hs18_24, -pct_bach_deg18_24, -pct_some_col18_24,  -percent_married, -pct_employed16_over, -pct_private_coverage, -pct_private_coverage_alone, -pct_emp_priv_coverage, -pct_public_coverage, -pct_black, -pct_asian, -pct_other_race, -state_abb,  -county, -state, -geography,  -binned_inc, -uterine, -bladder, -ovary, -brca_cis, -cervix, -colorectal, -melanoma, -ovary, -prostate, -lungbronc)
 
 ```
+```{r lasso_with_redundant_removed}
+X = as.matrix(can_filt3 %>% dplyr::select(-target_death_rate) %>% sapply(as.numeric) %>% na.omit())
+Y = na.omit(can_filt3)$target_death_rate
+set.seed(1)
+
+train<-sample(1:nrow(X),nrow(X)/2)
+
+test<-(-train)
+
+Y.test<-Y[test]
+set.seed(2)
+doParallel::registerDoParallel()
+cv.out<-cv.glmnet(X[train,],Y[train], alpha=1,nfolds = 10, parallel = TRUE, lambda = grid)
+plot(cv.out)
+best.lambda<-cv.out$lambda.min
+lasso.pred <- predict(cv.out,s=best.lambda,newx=X[test,])
+final_lasso_with_inc_reduced_single_can_MSE <-mean((lasso.pred-Y.test)^2) #MSE
+lasso3<-glmnet(X, Y, alpha=1, lambda=best.lambda)
+# res_lasso_ls<- cbind(coef(mult.fit),coef(lasso3))
+# colnames(res_lasso_ls) <- c("LS", "lasso")
+res_lasso <- coef(lasso3) 
+res_lasso %>% as.matrix() %>% as.data.frame() %>% add_rownames() %>% as.tibble() %>% 
+  mutate(abs_lasso = abs(s0)) %>% 
+  arrange(-abs_lasso) %>% knitr::kable()
+final_lasso_with_inc_reduced_single_can<-lasso3
+final_lasso_with_inc_reduced_single_can$dev.ratio
+```
+
+
+We have now created another model with dev ratio of `r final_lasso_with_inc_reduced_single_can$dev.ratio` and MSE = `r final_lasso_with_inc_reduced_single_can_MSE`. The model features are not quite so stunning, but it is simpler, easier to interpret, and incorporates more data. We'll find that this model doesn't put brca at the top. In fact, it's almost completely shrunken from the model entirely. There could be a lot of reasons for this, but one might be that the 5 year survival rate for breast cancer is nearly 100%. This could be attributable to treatment regimens.
+```{r missing}
+#there is some missing data, but only in the brca incidence.
+Amelia::missmap(can_filt3)
+```
+
+```{r averages_by_region}
+#which region has the highest BRCA incidence?
+can_filt3 %>% 
+  na.omit() %>% 
+  map(scale) %>% 
+  group_by(state_region) %>% 
+  # summarize(mean_brca = mean(brca),
+  #           mean_pct_public_coverage_alone = mean(pct_public_coverage_alone))
+  summarise_all("mean") %>% 
+  gather(variable,region_mean, -state_region) %>% 
+  ggplot(aes(x=variable,y=region_mean, color=state_region)) +
+  geom_point() + theme(axis.text.x = element_text(angle = 90, hjust = 1))
+  # skimr::skim() %>% 
+  # arrange(variable, region)
+#does brca play a bigger role there?
+
+```
+
 

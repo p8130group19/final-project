@@ -508,7 +508,7 @@ By removing the the median male age and the percent of individuals over 25 with 
 
 Given all the previous information, we'll attempt to combine the models now. Most of the variables are correlated with the predictor and according to lecture 21, slide  14, ridge should do better in this case. 
 
-```{r write_arff}
+```{r write_arff2}
 can_reg_arff <- can_reg_joined %>% mutate(binned_inc = as.numeric(as.factor(binned_inc))) %>% dplyr::select(-county,-geography, -state_abb) %>% mutate(state = as.numeric(as.factor(state))) %>% dplyr::select(everything(),target_death_rate)
 foreign::write.arff(x =  can_reg_arff, file = "can_reg_joinedv2.arff")
 ```
@@ -582,7 +582,7 @@ can_filt3$top_can <- apply(can_filt[,cancer_names],1,which.max) %>% map(.x = ., 
 can_filt3 <- can_filt3 %>% 
   #transmute(avg_household_size = log(avg_household_size)) %>% 
 #  mutate()
-  .[c(-1009,-2221,-2090,-1008,-2087,-2218, -1007,-1006,-1005,-1004,-1003,-1002),] %>% 
+#  .[c(-1009,-2221,-2090,-1008,-2087,-2218, -1007,-1006,-1005,-1004,-1003,-1002),] %>% 
 dplyr::select( -pop_est2015, -med_income, -avg_ann_count, -avg_deaths_per_year, -median_age, -median_age_male,        -pct_no_hs18_24, -pct_hs18_24, -pct_bach_deg18_24, -pct_some_col18_24,  -percent_married, -pct_employed16_over, -pct_private_coverage, -pct_private_coverage_alone, -pct_emp_priv_coverage, -pct_public_coverage, -pct_black, -pct_asian, -pct_other_race, -state_abb,  -county, -state, -geography,  -binned_inc, -uterine, -bladder, -ovary, -brca_cis, -cervix, -colorectal, -melanoma, -ovary, -prostate, -brca) #%>% 
 #   mutate(pct_unemployed16_over = (pct_unemployed16_over)^.5,
 #          poverty_percent = log(poverty_percent + 1e-2),
@@ -612,6 +612,7 @@ MASS::boxcox(lm(data=can_filt3, target_death_rate ~ atan(pct_white)))
 ```
 
 ```{r lasso_with_redundant_removed}
+#saveRDS(can_reg_joined,"can_reg_joined.rds")
 can_filt3 <- can_reg_joined %>% 
   janitor::clean_names() %>% 
     mutate(binned_inc = as.factor(binned_inc)) %>% 
@@ -655,7 +656,7 @@ res_lasso %>% as.matrix() %>% as.data.frame() %>% add_rownames() %>% as.tibble()
 final_lasso_with_inc_reduced_single_can<-lasso3
 final_lasso_with_inc_reduced_single_can$dev.ratio
 final_lasso_range<-glmnet(X, Y, alpha=1, lambda=grid)
-plotmo::plotres(final_lasso_range, info = T,which = 4) #non matter how many outliers, I remove, they always come back.
+plotmo::plotres(final_lasso_range, info = T,which = 1:9) #non matter how many outliers, I remove, they always come back.
 ```
 
 
@@ -686,7 +687,8 @@ can_filt3 %>%
 can_filt3 %>% 
   gather(variable,value,-state_region) %>% 
   mutate(value = as.numeric(as.character(value))) %>% 
-  mutate(value = heatmaply::percentize(value)) %>% 
+  group_by(variable) %>% 
+  summarize(transformed_value = heatmaply::percentize(value)) %>% 
 #  filter(variable != "study_per_cap") %>% 
      na.omit() %>% 
   # group_by(state_region) %>% 
@@ -742,4 +744,4 @@ https://rdrr.io/cran/ggtern/
 poverty, educaction, etc. many variables tend to go together, especially with lung cancer.
 smoking problably is a good way to go as well.
 access to treatments.
-percent public coverage alone-- show it's relationship to death rate and incidence rate.
+percent public coverage alone-- show it's relationship to death rate and incidence rate

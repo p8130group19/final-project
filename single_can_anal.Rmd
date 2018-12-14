@@ -157,14 +157,25 @@ poverty, educaction, etc. many variables tend to go together, especially with lu
 smoking problably is a good way to go as well.
 access to treatments.
 percent public coverage alone-- show it's relationship to death rate and incidence rate
-```{r ternary}
+```{r ternary, figure.width = 10 , figure.height = 10}
 #could do a ternary for each region (facet)
 #https://rpubs.com/KDVdecisions/triadtutorial1
 # can_filt3 %>% 
 #   mutate(pct_nonwhite = 1-pct_white) %>%
 #   ggplot(data=.) %>% 
-#s  ggtern::ggtern(data=can_filt3, mapping= aes(x=poverty_percent,y=target_death_rate,z=pct_bach_deg25_over), geom='polygon') +
-can_filt3[,c("poverty_percent","target_death_rate","pct_bach_deg25_over")] %>% cor() %>%  corrplot()
-#  geom_point()
+
+ggtern_plot <-  ggtern::ggtern(data=na.omit(can_filt3), mapping= aes(x=fmsb::percentile(poverty_percent),y=fmsb::percentile(target_death_rate),z=fmsb::percentile(pct_bach_deg25_over),facet=state_region, color = fmsb::percentile(pct_public_coverage_alone)), geom='polygon') +
+  stat_density_tern(aes(fill=..level.., alpha=..level..),geom='polygon') +
+  scale_fill_gradient2(high = "red") +         
+   geom_point() + facet_wrap(~state_region,ncol=2, nrow=2) + scale_color_viridis_c() + geom_density_tern() + theme_showarrows() +
+  guides(fill = "none", alpha = "none") +
+  labs (x = "Poverty", y = "Death Rate", z = "% Bachelor's Degree") +  theme(legend.position = "bottom")
+
+can_filt3[can_filt3$state_region=="South",c("poverty_percent","target_death_rate","pct_bach_deg25_over")] %>% cor(use = "pairwise.complete.obs") %>%  corrplot(order="hclust", method = "number")
+can_filt3[can_filt3$state_region=="Northeast",c("poverty_percent","target_death_rate","pct_bach_deg25_over")] %>% cor(use = "pairwise.complete.obs") %>%  corrplot(order="hclust", method = "number")
+can_filt3[can_filt3$state_region=="North Central",c("poverty_percent","target_death_rate","pct_bach_deg25_over")] %>% cor(use = "pairwise.complete.obs") %>%  corrplot(order="hclust", method = "number")
+can_filt3[can_filt3$state_region=="West",c("poverty_percent","target_death_rate","pct_bach_deg25_over")] %>% cor(use = "pairwise.complete.obs") %>%  corrplot(order="hclust", method = "number")
 ```
 
+It's compelling that the relationship between poverty and death rate is strongest in certain regions, namely in the west. A more indepth view of states within the west and north areas this may provide additional insight.
+We'll also note that the relationship between education, poverty, cancer death rate, and insurance has interesting regional trends.

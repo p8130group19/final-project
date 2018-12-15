@@ -1,0 +1,7 @@
+modeling.RData filter=lfs diff=lfs merge=lfs -text
+modeling2.RData filter=lfs diff=lfs merge=lfs -text
+modeling3.RData filter=lfs diff=lfs merge=lfs -text
+modeling4.RData filter=lfs diff=lfs merge=lfs -text
+can_reg_state.rds filter=lfs diff=lfs merge=lfs -text
+can_reg.rds filter=lfs diff=lfs merge=lfs -text
+can_reg_joined.rds filter=lfs diff=lfs merge=lfs -text

@@ -347,14 +347,63 @@ final_lasso_florida_range<-glmnet(X, Y, alpha=1, lambda=grid)
 plotmo::plotres(final_lasso_range, info = T,which = 1:9) 
 spacingTest(X,Y) %>% knitr::kable()
 ```
-What's rather amazing here is that the proportion of deviance explained by this model explains a whopping `r final_lasso_florida$dev_ratio*100` % of the variance. The model looks reasonable, with the exception of one outlier. The target death rate there is roughly 3 times the national average, the poverty percent is above average, median income is below, and the percent of individuals with a college education hits the single digits. This is an outlier in the sense that it is a point that is apart from the rest in a res vs fitted plot, but it is a real feature of the data and should not be removed.
+What's rather amazing here is that the proportion of deviance explained by this model explains a whopping `r final_lasso_florida$dev_ratio*100` % of the variance. The model looks reasonable, with the exception of two outliers. The target death rate there is roughly 3 times the national average, the poverty percent is above average, median income is below, and the percent of individuals with a college education hits the single digits. This is an outlier in the sense that it is a point that is apart from the rest in a res vs fitted plot, but it is a real feature of the data and should not be removed. Upon looking for evidence of htis, a recent article in JAMA cited this information (https://www.ncbi.nlm.nih.gov/pubmed/28118455), specifically mentioning this county last year. The article also mentions Utah and Idaho as low regions, just as we found.
 ```{r}
 
-can_filt_florida[62,]
+can_filt_florida[c(37,62),]
+```
+Two outliers are noted above. Throughout the data, there tend to be areas where the incidence of lung cancer is high and cancer death rate is high, which influences the model. Admittedly this may cause misleading results, but the data looks to be not in error and this sort of relationship was what was sought to be captured from the beginnning.
+
+```{r, fig.width=10,fig.height=10,fig.align="center"}
+#add in smoking, clinincal data, etc..
+corrplot(cor(cbind(X,Y),method="kendall"),method = "number",order = "hclust")
+corrplot(cor(cbind(X,Y),method="spearman")-cor(cbind(X,Y),method="pearson"),method = "number",order = "hclust")
+corrplot(cor(cbind(X,Y)[,c("Y","incidence_rate","lungbronc")],method="kendall"),method = "number",order = "hclust")
+corrplot(cor(cbind(X,Y)[,c("Y","incidence_rate","lungbronc")],method="pearson"),method = "number",order = "hclust")
+```
+It's actually quite remarkable... union county was mentioned in the JAMA article as well. The outlier also agrees with the data model, the poverty level is above the national average, the median income is low, the incidence rate is 3 times higher than that of the next highest county. Almost zero of the population possess a college education and the percent of public coverage is lower than the national average of `r mean(can_filt4$pct_public_coverage_alone)`%.
+```{r}
+ggplot(data=as.data.frame(cbind(X,Y)),aes(y=Y,x=lungbronc)) + geom_point()
+can_filt_florida %>% 
+  arrange(-lungbronc,-target_death_rate) %>% 
+  select(county,state,lungbronc,target_death_rate,everything())
+
 ```
 
-#add in smoking, clinincal data, etc..
-```{r, fig.width=10,fig.height=10,fig.align="center"}
-corrplot(cor(cbind(X,Y),method="kendall"),method = "number",order = "hclust")
+```{r}
+
 ```
-Education seems to play a role in many sections of this data and it seems to be where the strongest signatures come from. Behavioral data should be added along with smoking rates.
+
+Education seems to play a role in many sections of this data and it seems to be where the strongest signatures come from. Behavioral data should be added along with smoking rates. The BRFSS data is not subsampled, but just contains sparse responses. However, it is a currently used resource in literature precisely for this topic (https://pophealthmetrics.biomedcentral.com/articles/10.1186/1478-7954-12-5).
+```{r eval=F} 
+p8105.datasets::brfss_smart2010 %>% 
+  janitor::clean_names() %>% 
+  filter(
+    question=="Adults who are current smokers (variable calculated from one or more BRFSS questions)" & response=="No" & year==2010
+#str_detect(string = Question,pattern = "smok")
+) %>% 
+  mutate(smoking_pct = 1-data_value) %>% 
+  #select(locationabbr, locationdesc, data_value) %>% 
+  arrange(-smoking_pct)
+```
+In the south region, we'll also take a look at e-cigarette utilization and cigarette utilization.
+```{r smok_ecig, results = 'asis'}
+smok_rate <- read_csv("./smoking/Behavioral_Risk_Factor_Data__Tobacco_Use__2011_to_present_.csv") %>% 
+  janitor::clean_names() %>% 
+  filter(year == "2017" & topic_desc == "Cigarette Use (Adults)" & race == "All Races" & response == "Never" & gender == "Overall") %>% 
+  mutate(pct_have_smoked = 1-data_value) %>% 
+  mutate(pct_never_smoker = data_value) %>%
+  select(location_desc,data_value,pct_have_smoked,pct_never_smoker,location_abbr) %>% 
+  arrange(-pct_have_smoked)
+smok_rate %>% knitr::kable()
+ecig_rate <- read_csv("./smoking/Behavioral_Risk_Factor_Data__Tobacco_Use__2011_to_present_.csv") %>%
+  janitor::clean_names() %>% 
+  filter(year == "2017" & topic_desc == "E-Cigarette Use (Adults)" & race == "All Races" & response == "Never" & gender == "Overall") %>% 
+  mutate(pct_have_smoked = 1-data_value) %>% 
+  mutate(pct_never_smoker = data_value) %>%
+  select(location_desc,data_value,pct_have_smoked,pct_never_smoker,location_abbr) %>% 
+  arrange(-pct_have_smoked)
+#ecig_rate$year %>% unique()
+ecig_rate %>% knitr::kable()
+```
+

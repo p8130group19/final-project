@@ -61,7 +61,11 @@ res_lasso %>% as.matrix() %>% as.data.frame() %>% add_rownames() %>% as.tibble()
 final_lasso_with_inc_reduced_single_can<-lasso3
 final_lasso_with_inc_reduced_single_can$dev.ratio
 final_lasso_range<-glmnet(X, Y, alpha=1, lambda=grid)
-plotmo::plotres(final_lasso_range, info = T,which = 1) 
+plotmo::plotres(final_lasso_range, info = T,which = 1:4) 
+ # res_lasso %>% as.matrix() %>% as.data.frame() %>% add_rownames() %>% as.tibble() %>% 
+ #  mutate(abs_lasso = abs(s0)) %>% 
+ #  arrange(-abs_lasso) %>% View()
+
 ```
 
 
@@ -85,6 +89,7 @@ covtest_spacing_pval <- tibble(predictor = colnames(X)[spacing_test$vars],spacin
 #spacing_test_table %>% coef.lar()
 #length(Y)
 covtest_spacing_pval %>% knitr::kable()
+#covtest_spacing_pval %>% View
 ```
 Using a test suggested by Tshibirani in his text, (statistical learning with sparsity, the lasso and its generalizations, p.161), we find that the lung-bronchial cancer incidence rate, the raw incidence rate for all cancers, and both college education and high school education status have a nonzero coefficient in the least angle regression model. The text suggests that this test is superior to the covariance test in that the entire model is not tested at each knot, but rather "whether the partial correlation of the given predictor entered in that step [knot] is zero, adjusting for other variables currently in the model" (p.161). As such, it does not simply test for the lasso path, but for the individual contribution of each predictor to the model. As we might gather, this agrees completely with the covariance test results and with the confidence intervals that do not contain zero in the least angle regression estimate confidence interval. It is often said that p-values are not sharp cutoffs and the adjustment procedure here has been very conservative. 
 ```{r missing}
@@ -258,6 +263,7 @@ final_lasso_with_inc_reduced_single_can<-lasso3
 final_lasso_with_inc_reduced_single_can$dev.ratio
 final_lasso_range<-glmnet(X, Y, alpha=1, lambda=grid)
 plotmo::plotres(final_lasso_range, info = T,which = 1:4) 
+
 ```
 After constructing a subset lasso model, we find that the number of factors decreases substantially, leaving education as the largest mangitude predictor, with married households and unemployment remaining with the incidence rates. What's interesting is the percentage of married households is important. This is somewhat unexpected.
 
@@ -344,7 +350,7 @@ res_lasso %>% as.matrix() %>% as.data.frame() %>% add_rownames() %>% as.tibble()
 final_lasso_florida<-lasso3
 final_lasso_florida$dev.ratio
 final_lasso_florida_range<-glmnet(X, Y, alpha=1, lambda=grid)
-plotmo::plotres(final_lasso_range, info = T,which = 1:9) 
+plotmo::plotres(final_lasso_range, info = T,which = 1:4) 
 spacingTest(X,Y) %>% knitr::kable()
 ```
 What's rather amazing here is that the proportion of deviance explained by this model explains a whopping `r final_lasso_florida$dev_ratio*100` % of the variance. The model looks reasonable, with the exception of two outliers. The target death rate there is roughly 3 times the national average, the poverty percent is above average, median income is below, and the percent of individuals with a college education hits the single digits. This is an outlier in the sense that it is a point that is apart from the rest in a res vs fitted plot, but it is a real feature of the data and should not be removed. Upon looking for evidence of htis, a recent article in JAMA cited this information (https://www.ncbi.nlm.nih.gov/pubmed/28118455), specifically mentioning this county last year. The article also mentions Utah and Idaho as low regions, just as we found.

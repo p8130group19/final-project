@@ -6,7 +6,7 @@ output: html_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE, cache = T, warning = F, message = F)
 library(tidyverse)
 library(corrplot)
 library(glmnet)
@@ -42,11 +42,8 @@ dplyr::select( -pop_est2015, -med_income, -avg_ann_count, -avg_deaths_per_year, 
 X = as.matrix(can_filt3 %>% dplyr::select(-target_death_rate) %>% sapply(as.numeric) %>% na.omit())
 Y = na.omit(can_filt3)$target_death_rate
 set.seed(1)
-
 train<-sample(1:nrow(X),nrow(X)/2)
-
 test<-(-train)
-
 Y.test<-Y[test]
 set.seed(2)
 doParallel::registerDoParallel()
@@ -56,9 +53,6 @@ best.lambda<-cv.out$lambda.min
 lasso.pred <- predict(cv.out,s=best.lambda,newx=X[test,])
 final_lasso_with_inc_reduced_single_can_MSE <-mean((lasso.pred-Y.test)^2) #MSE
 lasso3<-glmnet(X, Y, alpha=1, lambda=best.lambda)
-
-# res_lasso_ls<- cbind(coef(mult.fit),coef(lasso3))
-# colnames(res_lasso_ls) <- c("LS", "lasso")
 res_lasso <- coef(lasso3) 
 res_lasso %>% as.matrix() %>% as.data.frame() %>% add_rownames() %>% as.tibble() %>% 
   mutate(abs_lasso = abs(s0)) %>% 
@@ -71,6 +65,27 @@ plotmo::plotres(final_lasso_range, info = T,which = 1)
 
 
 We have now created another model with dev ratio of `r final_lasso_with_inc_reduced_single_can$dev.ratio` and MSE = `r final_lasso_with_inc_reduced_single_can_MSE`. The model features are not quite so stunning, but it is simpler, easier to interpret, and incorporates more data. We'll find that this model doesn't put brca at the top. In fact, it's almost completely shrunken from the model entirely. There could be a lot of reasons for this, but one might be that the 5 year survival rate for breast cancer is nearly 90%. This could be attributable to treatment regimens, but other cancers may be easier to predict death rate.
+```{r spacing_test}
+library(selectiveInference)
+lar_full<-selectiveInference::lar(x = X,y = Y)
+spacing_test<-selectiveInference::larInf(lar_full) #this is a better test that actually gives inference of the individual predictor's correlation.
+spacing_test$predictor <- colnames(X)[spacing_test$var]
+#class(spacing_test_table)<-"list"
+ci_tibble <- spacing_test$ci %>% as.tibble()
+colnames(ci_tibble)<-c("upper_CI","LowerCI")
+covtest_spacing_pval <- tibble(predictor = colnames(X)[spacing_test$vars],spacing.p.value = spacing_test$pv.spacing, covtest.pval = spacing_test$pv.covtest) %>%
+  bind_cols(ci_tibble) %>% 
+  mutate(significance = ifelse(spacing.p.value < 0.05, "*","")) %>% 
+  mutate(adj.spacing.pvalue = p.adjust(spacing.p.value)) %>% 
+  mutate(significance_adj = ifelse(adj.spacing.pvalue < 0.05, "*","")) %>%
+  select(covtest.pval,spacing.p.value,significance,adj.spacing.pvalue,significance_adj,everything()) %>% 
+  dplyr::arrange(spacing.p.value)
+#nrow(X)
+#spacing_test_table %>% coef.lar()
+#length(Y)
+covtest_spacing_pval %>% knitr::kable()
+```
+Using a test suggested by Tshibirani in his text, (statistical learning with sparsity, the lasso and its generalizations, p.161), we find that the lung-bronchial cancer incidence rate, the raw incidence rate for all cancers, and both college education and high school education status have a nonzero coefficient in the least angle regression model. The text suggests that this test is superior to the covariance test in that the entire model is not tested at each knot, but rather "whether the partial correlation of the given predictor entered in that step [knot] is zero, adjusting for other variables currently in the model" (p.161). As such, it does not simply test for the lasso path, but for the individual contribution of each predictor to the model. As we might gather, this agrees completely with the covariance test results and with the confidence intervals that do not contain zero in the least angle regression estimate confidence interval.
 ```{r missing}
 #there is some missing data, but only in the brca incidence.
 Amelia::missmap(can_filt3)
@@ -170,12 +185,84 @@ ggtern_plot <-  ggtern::ggtern(data=na.omit(can_filt3), mapping= aes(x=fmsb::per
    geom_point() + facet_wrap(~state_region,ncol=2, nrow=2) + scale_color_viridis_c() + geom_density_tern() + theme_showarrows() +
   guides(fill = "none", alpha = "none") +
   labs (x = "Poverty", y = "Death Rate", z = "% Bachelor's Degree") +  theme(legend.position = "bottom")
-
+ggtern_plot
 can_filt3[can_filt3$state_region=="South",c("poverty_percent","target_death_rate","pct_bach_deg25_over")] %>% cor(use = "pairwise.complete.obs") %>%  corrplot(order="hclust", method = "number")
 can_filt3[can_filt3$state_region=="Northeast",c("poverty_percent","target_death_rate","pct_bach_deg25_over")] %>% cor(use = "pairwise.complete.obs") %>%  corrplot(order="hclust", method = "number")
 can_filt3[can_filt3$state_region=="North Central",c("poverty_percent","target_death_rate","pct_bach_deg25_over")] %>% cor(use = "pairwise.complete.obs") %>%  corrplot(order="hclust", method = "number")
 can_filt3[can_filt3$state_region=="West",c("poverty_percent","target_death_rate","pct_bach_deg25_over")] %>% cor(use = "pairwise.complete.obs") %>%  corrplot(order="hclust", method = "number")
 ```
 
-It's compelling that the relationship between poverty and death rate is strongest in certain regions, namely in the west. A more indepth view of states within the west and north areas this may provide additional insight.
+It's compelling that the relationship between poverty and death rate is strongest in certain regions, namely in the west. A more indepth view of states within the west state areas this may provide additional insight.  We'll add back in the state and county data to see which states/counties may be responsible for the incredibly weak link between poverty and death rate in the west.
+
+```{r}
+can_filt4 <- can_reg_joined %>% 
+  janitor::clean_names() %>% 
+    mutate(binned_inc = as.factor(binned_inc)) %>% 
+  mutate(binned_inc = fct_reorder(.f = binned_inc,.x = med_income)) 
+can_filt4$top_can <- apply(can_filt4[,cancer_names],1,which.max) %>% map(.x = ., .f = ~ifelse(length(.)==0,"none",cancer_names[.])) %>% unlist() %>% as.factor()
+#apply(can_filt[,cancer_names],1,which.max) %>% unlist() %>% table() %>% names(.) %>% as.numeric() %>% cancer_names[.]
+can_filt4 <- can_filt4 %>% 
+  #transmute(avg_household_size = log(avg_household_size)) %>% 
+#  mutate()
+#  .[c(-1009,-2221,-2090,-1008,-2087,-2218, -1007,-1006,-1005,-1004,-1003, -1002),] %>% 
+dplyr::select( -pop_est2015,  -avg_ann_count, -avg_deaths_per_year, -median_age, -median_age_male,        -pct_no_hs18_24, -pct_hs18_24, -pct_bach_deg18_24, -pct_some_col18_24,  -percent_married, -pct_employed16_over, -pct_private_coverage, -pct_private_coverage_alone, -pct_emp_priv_coverage, -pct_public_coverage, -pct_black, -pct_asian, -pct_other_race, -state_abb,   -geography,  -binned_inc, -uterine, -bladder, -ovary, -brca_cis, -cervix, -colorectal, -melanoma, -ovary, -prostate, -brca, -study_per_cap)
+
+```
+```{r}
+can_filt4 %>% 
+  filter(state_region == "West") %>% 
+  group_by(state) %>% 
+  summarize(dr_pov_cor = cor(target_death_rate,poverty_percent),
+            abs_dr_pov_cor = abs(dr_pov_cor)) %>% 
+  arrange(abs_dr_pov_cor)
+```
+We'll note that, on the whole, in the western states, poverty percentage has a very weak linear relationship with cancer death rate. Utah and Oregon are the exceptions. Alaska and Hawaii are the exceptions. These states tend to have lower smoking rates generally(https://www.cdc.gov/tobacco/data_statistics/fact_sheets/adult_data/cig_smoking/index.htm), although honestly the reasons behinid this lack of poverty disparity is likely has many influencing factors. It may be that poverty doesn't adequately describe some of these areas and so we'll look at median income's relationship (even though including it would have created issues of redundant measures or multicollinearity).
+```{r}
+can_filt4 %>% 
+  filter(state_region == "West") %>% 
+  group_by(state) %>% 
+  summarize(dr_inc_cor = cor(target_death_rate,med_income),
+            abs_dr_inc_cor = abs(dr_inc_cor)) %>% 
+  arrange(abs_dr_inc_cor)
+lm(data=can_filt4 %>% 
+  filter(state_region == "West") %>% select(-state_region, -county, -state),target_death_rate ~ .) %>% 
+  broom::tidy() %>% 
+  mutate(p.value = p.adjust(p.value)) %>% 
+  arrange(p.value)
+```
+We using the above model with adjusted p-values, we find that the estimate for median income in this region is near zero. Education remains as the highest socioeconomic predictor.
+
+```{r}
+can_filt4_west <- can_filt4 %>% 
+    filter(state_region == "West") 
+X = as.matrix(can_filt4_west %>% dplyr::select(-target_death_rate, -state, -county) %>% sapply(as.numeric) %>% na.omit())
+Y = na.omit(can_filt4_west)$target_death_rate
+set.seed(1)
+train<-sample(1:nrow(X),nrow(X)/2)
+test<-(-train)
+Y.test<-Y[test]
+set.seed(2)
+doParallel::registerDoParallel()
+cv.out<-cv.glmnet(X[train,],Y[train], alpha=0.5,nfolds = 10, parallel = TRUE, lambda = grid)
+plot(cv.out)
+best.lambda<-cv.out$lambda.min
+lasso.pred <- predict(cv.out,s=best.lambda,newx=X[test,])
+final_lasso_west_can_MSE <-mean((lasso.pred-Y.test)^2) #MSE
+lasso3<-glmnet(X, Y, alpha=1, lambda=best.lambda)
+res_lasso <- coef(lasso3) 
+res_lasso %>% as.matrix() %>% as.data.frame() %>% add_rownames() %>% as.tibble() %>% 
+  mutate(abs_lasso = abs(s0)) %>% 
+  arrange(-abs_lasso) %>% knitr::kable()
+final_lasso_with_inc_reduced_single_can<-lasso3
+final_lasso_with_inc_reduced_single_can$dev.ratio
+final_lasso_range<-glmnet(X, Y, alpha=1, lambda=grid)
+plotmo::plotres(final_lasso_range, info = T,which = 1:4) 
+
+```
+After constructing a subset lasso model, we find that the number of factors decreases substantially, leaving education as the largest mangitude predictor, with married households and unemployment remaining with the incidence rates.
+
+
+Say something about how important states or regional geography is in the model.
+
+
 We'll also note that the relationship between education, poverty, cancer death rate, and insurance has interesting regional trends.

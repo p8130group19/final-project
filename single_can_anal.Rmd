@@ -195,7 +195,7 @@ ggtern_plot <-  ggtern::ggtern(data=na.omit(can_filt3), mapping= aes(x=fmsb::per
   guides(fill = "none", alpha = "none") +
   labs (x = "Poverty", y = "Death Rate", z = "% Bachelor's Degree", color = "% Public Insurance Coverage Alone") +  theme(legend.position = "bottom") + Tlab(label = "", labelarrow = "Death Rate") + Llab(label = "", labelarrow = "Poverty") + Rlab(label = "", labelarrow = "% witout Bach")
 ggtern_plot
-par(mfrow)
+#par(mfrow)
 # can_filt3[can_filt3$state_region=="South",c("poverty_percent","target_death_rate","pct_bach_deg25_over")] %>% transmute(poverty_percent = poverty_percent, target_death_rate, pct_without_deg = 100-pct_bach_deg25_over) %>% cor(use = "pairwise.complete.obs", method="kendall") %>%  corrplot(order="hclust", method = "number")
 # can_filt3[can_filt3$state_region=="South",c("poverty_percent","target_death_rate","pct_bach_deg25_over")] %>% cor(use = "pairwise.complete.obs", method="kendall") %>%  corrplot(order="hclust", method = "number")
 # can_filt3[can_filt3$state_region=="Northeast",c("poverty_percent","target_death_rate","pct_bach_deg25_over")] %>% cor(use = "pairwise.complete.obs", method="kendall") %>%  corrplot(order="hclust", method = "number")
@@ -210,23 +210,6 @@ foreach::foreach(reg=levels(can_filt3$state_region)) %do%
 It's compelling that the relationship between poverty and death rate is strongest in certain regions, namely in the west. A more indepth view of states within the west state areas this may provide additional insight.  We'll add back in the state and county data to see which states/counties may be responsible for the incredibly weak link between poverty and death rate in the west. Ternary plots are uncommon, but a powerful way to display complex relationships of three independent variables (http://science.sciencemag.org/content/sci/215/4537/1191.full.pdf).
 Figure 4. Ternary plot suggests that the 3-way relationship between education, poverty, insurance coverage differs as the polygon placement and  shape differs, suggesting that numerical relationships between these three variabes is not equally strong in all pairwise relationships. Notably, we also find a large central peak in the south plot that shows that each of all three variables are related to each other (percentages of poverty, of indiviudals without a bachelor's degree, and percentile death rate). The high amount brightly colored points suggests counties with a high percentage of indiviudals with only public coverage. In short, all of the variables are related well in the  south, but not so in the west (which contains lower income areas that are highly educated and with the lowest cancer areas in the country).
 
-dissimilarity is apparent. the percent of individuals with a bachelor's degree, shown by the polygon in red in high density areas differs by geographic region in the data. Color suggests
-```{r contour}
-contour_plot <-  ggplot(data=can_filt3[,c("poverty_percent","target_death_rate","pct_bach_deg25_over","pct_public_coverage_alone")] %>% head(), mapping= aes(x=fmsb::percentile(poverty_percent),
-                                                              y=fmsb::percentile(target_death_rate),
-                                                              z=fmsb::percentile(pct_bach_deg25_over),
-#                                                              facet=state_region, 
-                                                              color = fmsb::percentile(pct_public_coverage_alone))) +
-  #geom_point()
-  #stat_density_tern(aes(fill=..level.., alpha=..level..),geom='polygon') +
-  stat_contour(geom="polygon", aes(z = fmsb::percentile(pct_bach_deg25_over), fill = fmsb::percentile(pct_bach_deg25_over),
-                                  color= fmsb::percentile(pct_public_coverage_alone))) +
-  scale_fill_gradient2(high = "red") +         
-   geom_point() + facet_wrap(~state_region,ncol=2) + scale_color_viridis_c() + geom_density_tern() + theme_showarrows() +
-  guides(fill = "none", alpha = "none") +
-  labs (x = "Poverty", y = "Death Rate", z = "% Bachelor's Degree", color = "% Public Insurance Coverage Alone") +  theme(legend.position = "bottom") 
-contour_plot
-```
 
 ```{r}
 can_filt4 <- can_reg_joined %>% 

@@ -68,6 +68,9 @@ plotmo::plotres(final_lasso_range, info = T,which = 1:4)
 
 ```
 
+```{r corrplot}
+corrplot(cor(X))
+```
 
 We have now created another model with dev ratio of `r final_lasso_with_inc_reduced_single_can$dev.ratio` and MSE = `r final_lasso_with_inc_reduced_single_can_MSE`. The model features are not quite so stunning, but it is simpler, easier to interpret, and incorporates more data. We'll find that this model doesn't put brca at the top. In fact, it's almost completely shrunken from the model entirely. There could be a lot of reasons for this, but one might be that the 5 year survival rate for breast cancer is nearly 90%. This could be attributable to treatment regimens, but other cancers may be easier to predict death rate.
 ```{r spacing_test}
@@ -185,20 +188,45 @@ percent public coverage alone-- show it's relationship to death rate and inciden
 #   mutate(pct_nonwhite = 1-pct_white) %>%
 #   ggplot(data=.) %>% 
 
-ggtern_plot <-  ggtern::ggtern(data=na.omit(can_filt3), mapping= aes(x=fmsb::percentile(poverty_percent),y=fmsb::percentile(target_death_rate),z=fmsb::percentile(pct_bach_deg25_over),facet=state_region, color = fmsb::percentile(pct_public_coverage_alone)), geom='polygon') +
+ggtern_plot <-  ggtern::ggtern(data=na.omit(can_filt3), mapping= aes(x=fmsb::percentile(poverty_percent),y=fmsb::percentile(target_death_rate),z=fmsb::percentile(1-pct_bach_deg25_over),facet=state_region, color = fmsb::percentile(pct_public_coverage_alone)), geom='polygon') +
   stat_density_tern(aes(fill=..level.., alpha=..level..),geom='polygon') +
   scale_fill_gradient2(high = "red") +         
-   geom_point() + facet_wrap(~state_region,ncol=2, nrow=2) + scale_color_viridis_c() + geom_density_tern() + theme_showarrows() +
+   geom_point() + facet_wrap(~state_region,ncol=2) + scale_color_viridis_c() + geom_density_tern() + theme_showarrows() +
   guides(fill = "none", alpha = "none") +
-  labs (x = "Poverty", y = "Death Rate", z = "% Bachelor's Degree") +  theme(legend.position = "bottom")
+  labs (x = "Poverty", y = "Death Rate", z = "% Bachelor's Degree", color = "% Public Insurance Coverage Alone") +  theme(legend.position = "bottom") + Tlab(label = "", labelarrow = "Death Rate") + Llab(label = "", labelarrow = "Poverty") + Rlab(label = "", labelarrow = "% witout Bach")
 ggtern_plot
-can_filt3[can_filt3$state_region=="South",c("poverty_percent","target_death_rate","pct_bach_deg25_over")] %>% cor(use = "pairwise.complete.obs") %>%  corrplot(order="hclust", method = "number")
-can_filt3[can_filt3$state_region=="Northeast",c("poverty_percent","target_death_rate","pct_bach_deg25_over")] %>% cor(use = "pairwise.complete.obs") %>%  corrplot(order="hclust", method = "number")
-can_filt3[can_filt3$state_region=="North Central",c("poverty_percent","target_death_rate","pct_bach_deg25_over")] %>% cor(use = "pairwise.complete.obs") %>%  corrplot(order="hclust", method = "number")
-can_filt3[can_filt3$state_region=="West",c("poverty_percent","target_death_rate","pct_bach_deg25_over")] %>% cor(use = "pairwise.complete.obs") %>%  corrplot(order="hclust", method = "number")
+par(mfrow)
+# can_filt3[can_filt3$state_region=="South",c("poverty_percent","target_death_rate","pct_bach_deg25_over")] %>% transmute(poverty_percent = poverty_percent, target_death_rate, pct_without_deg = 100-pct_bach_deg25_over) %>% cor(use = "pairwise.complete.obs", method="kendall") %>%  corrplot(order="hclust", method = "number")
+# can_filt3[can_filt3$state_region=="South",c("poverty_percent","target_death_rate","pct_bach_deg25_over")] %>% cor(use = "pairwise.complete.obs", method="kendall") %>%  corrplot(order="hclust", method = "number")
+# can_filt3[can_filt3$state_region=="Northeast",c("poverty_percent","target_death_rate","pct_bach_deg25_over")] %>% cor(use = "pairwise.complete.obs", method="kendall") %>%  corrplot(order="hclust", method = "number")
+# can_filt3[can_filt3$state_region=="North Central",c("poverty_percent","target_death_rate","pct_bach_deg25_over")] %>% cor(use = "pairwise.complete.obs", method="kendall") %>%  corrplot(order="hclust", method = "number")
+# can_filt3[can_filt3$state_region=="West",c("poverty_percent","target_death_rate","pct_bach_deg25_over")] %>% cor(use = "pairwise.complete.obs", method="kendall") %>%  corrplot(order="hclust", method = "number")
+foreach::foreach(reg=levels(can_filt3$state_region)) %do%
+{
+  can_filt3[can_filt3$state_region==reg,c("poverty_percent","target_death_rate","pct_bach_deg25_over","pct_public_coverage_alone")] %>% transmute(poverty_percent = poverty_percent, target_death_rate,pct_public_coverage_alone = pct_public_coverage_alone, pct_without_deg = 100-pct_bach_deg25_over) %>% cor(use = "pairwise.complete.obs", method="pearson") %>%  corrplot( method = "number", title=paste0(reg,"region"))
+}
 ```
 
-It's compelling that the relationship between poverty and death rate is strongest in certain regions, namely in the west. A more indepth view of states within the west state areas this may provide additional insight.  We'll add back in the state and county data to see which states/counties may be responsible for the incredibly weak link between poverty and death rate in the west.
+It's compelling that the relationship between poverty and death rate is strongest in certain regions, namely in the west. A more indepth view of states within the west state areas this may provide additional insight.  We'll add back in the state and county data to see which states/counties may be responsible for the incredibly weak link between poverty and death rate in the west. Ternary plots are uncommon, but a powerful way to display complex relationships of three independent variables (http://science.sciencemag.org/content/sci/215/4537/1191.full.pdf).
+Figure 4. Ternary plot suggests that the 3-way relationship between education, poverty, insurance coverage differs as the polygon placement and  shape differs, suggesting that numerical relationships between these three variabes is not equally strong in all pairwise relationships. Notably, we also find a large central peak in the south plot that shows that each of all three variables are related to each other (percentages of poverty, of indiviudals without a bachelor's degree, and percentile death rate). The high amount brightly colored points suggests counties with a high percentage of indiviudals with only public coverage. In short, all of the variables are related well in the  south, but not so in the west (which contains lower income areas that are highly educated and with the lowest cancer areas in the country).
+
+dissimilarity is apparent. the percent of individuals with a bachelor's degree, shown by the polygon in red in high density areas differs by geographic region in the data. Color suggests
+```{r contour}
+contour_plot <-  ggplot(data=can_filt3[,c("poverty_percent","target_death_rate","pct_bach_deg25_over","pct_public_coverage_alone")] %>% head(), mapping= aes(x=fmsb::percentile(poverty_percent),
+                                                              y=fmsb::percentile(target_death_rate),
+                                                              z=fmsb::percentile(pct_bach_deg25_over),
+#                                                              facet=state_region, 
+                                                              color = fmsb::percentile(pct_public_coverage_alone))) +
+  #geom_point()
+  #stat_density_tern(aes(fill=..level.., alpha=..level..),geom='polygon') +
+  stat_contour(geom="polygon", aes(z = fmsb::percentile(pct_bach_deg25_over), fill = fmsb::percentile(pct_bach_deg25_over),
+                                  color= fmsb::percentile(pct_public_coverage_alone))) +
+  scale_fill_gradient2(high = "red") +         
+   geom_point() + facet_wrap(~state_region,ncol=2) + scale_color_viridis_c() + geom_density_tern() + theme_showarrows() +
+  guides(fill = "none", alpha = "none") +
+  labs (x = "Poverty", y = "Death Rate", z = "% Bachelor's Degree", color = "% Public Insurance Coverage Alone") +  theme(legend.position = "bottom") 
+contour_plot
+```
 
 ```{r}
 can_filt4 <- can_reg_joined %>% 
@@ -382,15 +410,35 @@ can_filt_florida %>%
 
 Education seems to play a role in many sections of this data and it seems to be where the strongest signatures come from. Behavioral data should be added along with smoking rates. The BRFSS data is not subsampled, but just contains sparse responses. However, it is a currently used resource in literature precisely for this topic (https://pophealthmetrics.biomedcentral.com/articles/10.1186/1478-7954-12-5).
 ```{r eval=F} 
-p8105.datasets::brfss_smart2010 %>% 
+abb2state <- state.name
+names(abb2state) <- toupper(state.abb)
+# can_inc_by_coun_st <- can_inc_by_coun %>% 
+#   mutate(state_abb = state2abb[state_name])
+
+can_filt4_brfss_smoke <- p8105.datasets::brfss_smart2010 %>% 
   janitor::clean_names() %>% 
   filter(
     question=="Adults who are current smokers (variable calculated from one or more BRFSS questions)" & response=="No" & year==2010
 #str_detect(string = Question,pattern = "smok")
 ) %>% 
   mutate(smoking_pct = 1-data_value) %>% 
+  separate(locationdesc,into=c("state", "county"),sep = " - ") %>% 
+  mutate(state = trimws(state),
+         county = trimws(county)) %>% 
+    mutate(state_name = abb2state[state]) %>% 
+  select(state_name,everything()) %>% 
+  inner_join(can_filt4, by=c("state_name" = "state", "county" = "county")) %>% 
+
+  #convert state abb to state name
+  select(state_name,county,smoking_pct, everything()) %>% 
   #select(locationabbr, locationdesc, data_value) %>% 
   arrange(-smoking_pct)
+#stringsplit
+#tolower
+#inner join.
+cor(can_filt4_brfss_smoke$smoking_pct,can_filt4_brfss_smoke$target_death_rate,use="pairwise.complete.obs")
+cor(can_filt4_brfss_smoke$smoking_pct,can_filt4_brfss_smoke$lungbronc,use="pairwise.complete.obs")
+lm(data = can_filt4_brfss_smoke, target_death_rate ~ smoking_pct) %>% broom::tidy() #%>% View
 ```
 In the south region, we'll also take a look at e-cigarette utilization and cigarette utilization.
 ```{r smok_ecig, results = 'asis'}

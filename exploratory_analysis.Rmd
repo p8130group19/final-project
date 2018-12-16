@@ -744,4 +744,4 @@ https://rdrr.io/cran/ggtern/
 poverty, educaction, etc. many variables tend to go together, especially with lung cancer.
 smoking problably is a good way to go as well.
 access to treatments.
-percent public coverage alone-- show it's relationship to death rate and incidence rate
+percent public coverage alone-- show it's relationship to death rate and incidence ratemo

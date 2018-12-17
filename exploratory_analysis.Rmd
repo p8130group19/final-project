@@ -15,11 +15,7 @@ library(covTest)
 can_reg <- read_csv("Cancer_Registry_fixed.csv") 
   
 #this is the same file, but the n in Dona ana county has been changed to remove the n~ and allow processing.
-skimr::skim_with(numeric = list(hist = NULL,min = min,max = max,kurtosis = e1071::kurtosis,skewness = e1071::skewness,IQR = IQR,
-                                mean = mean,
-                                cv = function(x){sd(x, na.rm = T)/mean(x, na.rm = T)}
-                                ))
-skimr::skim_with_defaults() #if having trouble with the above, try this or just subset teh columns that you  wish to skim.
+skimr::skim_with_defaults() #if having trouble with the above, try this or just subset the columns that you  wish to skim.
 can_reg %>% skimr::skim() #should replace the skimr results with the cleaned dataset.
 Amelia::missmap(can_reg)
 can_reg[,c(1,2,4:8,11:12,14:17,19:21,23:24,26:34)] %>% GGally::ggpairs()
@@ -91,17 +87,13 @@ all_pairwise_corr_sorted %>%
 
 ```{r diagnostics}
 educ<- lm(data = can_reg, as.formula(paste("TARGET_deathRate ~",paste(names(education_cols),collapse=" + "))))
-#str_c(names(education_cols),collapse = "")
-# educ<-lm(data = can_reg, formula =  target_DeathRate ~ PctNoHS18_24 + PctHS18_24 + PctSomeCol18_24 +
-#    PctBachDeg18_24 + PctHS25_Over + PctBachDeg25_Over)
 par(mfrow=c(2,2))
 plot(educ)
 ```
-the diagnostics look a bit imperfect. We'll recall that PctBachDeg18_24,  PctBachDeg25_Over, and PctNoHS18_24 were all skewed in distribution. We should apply a boxcox transformation to determine the correct transformations to take for each of these variables.
+The diagnostics look a bit imperfect. We'll recall that PctBachDeg18_24,  PctBachDeg25_Over, and PctNoHS18_24 were all skewed in distribution. We should apply a boxcox transformation to determine the correct transformations to take for each of these variables.
 ```{r transformed_lm_diags_educ}
 educ_log<-lm(data = na.omit(can_reg), formula =  TARGET_deathRate ~ log(PctNoHS18_24 + 1e-2) + PctHS18_24 + PctSomeCol18_24 +
    log(PctBachDeg18_24 + 1e-2) + PctHS25_Over + log(PctBachDeg25_Over + 1e-2))
-
 plot(educ_log)
 ```
 
@@ -114,16 +106,13 @@ can_reg_over_100<- can_reg %>%
   as.tibble() %>% 
   filter(MedianAge > 100) 
 can_reg_over_100[,c("Geography","MedianAge")]
-
 can_reg_over_100_female <- can_reg %>%
   as.tibble() %>% 
   filter(MedianAgeFemale > 100) 
 can_reg_over_100_male <- can_reg %>%
   as.tibble() %>% 
   filter(MedianAgeMale > 100) 
-
 can_reg_over_100[,c("Geography","MedianAge")]
-
 ```
 
 
@@ -137,13 +126,10 @@ region_table<- tibble::tibble(state.name,state.abb,state.region)
 #get state variable from county.
 #transform this to something that can be merged.
 #merge on region data using state.
-#can_reg$Geography
 can_reg_state <- can_reg %>% 
   janitor::clean_names() %>% 
   tidyr::separate(geography, c("county","state"), sep=", ", remove = FALSE) %>% 
-#  dplyr::select( county, state, geography, everything()) %>% 
   dplyr::left_join(region_table, by = c("state" = "state.name"))
-#  merge(x = .,y = region_table, by.x="state",by.y = "state.name")
 #Amelia::missmap(can_reg_state) #No new missing data from a bad merge.
 
 setdiff(names(can_reg %>% janitor::clean_names()),names(can_reg_state))
@@ -151,9 +137,6 @@ setdiff(names(can_reg_state),names(can_reg %>% janitor::clean_names()))
 ```
 ```{r adding_incidence_rates, eval = F}
 #add incidence rates from https://www.statecancerprofiles.cancer.gov/incidencerates/
-# additional_cancer_cols <- list.files("can_inc", full.names = T) %>% 
-#   map(read_csv, skip = 9, col_names = c("county","FIPS", "Met_Healthy_People_Objective", "Lower_95_Confidence_Interval", "Upper_95_Confidence_Interval", "Average_Annual_Count",
-#                                          "Recent_Trend","Recent_5_Year_Trend_in_Incidence _Rates", "Lower_95_Confidence_Interval_5yr","Upper_95_Confidence_Interval_5yr"))
 read_can_inc<-function(csvfile)
 {
   inc_df <- read_csv(csvfile, skip = 8) %>% 
@@ -171,25 +154,6 @@ read_can_inc<-function(csvfile)
 additional_cancer_cols <- list.files("can_inc", full.names = T) %>% 
 map(read_can_inc)
 names(additional_cancer_cols) <- list.files("can_inc") %>% gsub(x = .,pattern = ".csv",replacement = "")
-# list.files("can_inc", full.names = T)[2] %>% read_csv(skip = 8)
-# sapply(additional_cancer_cols,dim)
-#  county_diff <- setdiff(additional_cancer_cols[[8]] %>% janitor::clean_names() %>% pull(county),
-#            additional_cancer_cols[[1]] %>% janitor::clean_names() %>% pull(county))
-#  counties_cbind <- rowr::cbind.fill(additional_cancer_cols[[4]] %>% janitor::clean_names() %>% pull(county) %>% sort(),
-#            additional_cancer_cols[[1]] %>% janitor::clean_names() %>% pull(county) %>% sort()) 
-#  colnames(counties_cbind) <- c("ovary","bladder")
-#  counties_cbind %>% arrange(ovary,bladder)
-# additional_cancer_cols <- list.files("can_inc", full.names = T) %>% 
-# read_csv(file = "can_inc/bladder.csv", skip = 8)
-#  county_diff <- setdiff(additional_cancer_cols[[1]] %>% janitor::clean_names() %>% pull(county),
-#            additional_cancer_cols[[4]] %>% janitor::clean_names() %>% pull(county))
-# additional_cancer_cols[[4]]
-# can_reg_lung <- can_reg %>% 
-#   janitor::clean_names() %>% 
-#   separate(geography,into = c("county","state"), sep = ", ") %>% 
-#   left_join(additional_cancer_cols[[6]], by=c("county" = "county", "state" = "state")) %>% 
-#   mutate(incidence = as.numeric(incidence))
-# plyr::join_all()
 can_reg_joined <- can_reg_state
 for(i in 1:length(additional_cancer_cols))
 {
@@ -200,39 +164,24 @@ can_reg_joined <- can_reg_joined %>%
   mutate(incidence = as.numeric(incidence)) %>% 
   dplyr::select(-cancer)
   names(can_reg_joined) <- gsub(pattern = "^incidence$",replacement = paste0(names(additional_cancer_cols)[i]),x = names(can_reg_joined))
-  #mutate(paste0(names(additional_cancer_cols)[i]) = incidence)
-  
 }
 write_csv(x = can_reg_joined, path =   "can_reg_joined.csv")
 ```
-```{r write_arff}
-can_reg_arff <- can_reg_joined %>% mutate(binned_inc = as.numeric(as.factor(binned_inc))) %>% dplyr::select(-county,-geography, -state_abb) %>% mutate(state = as.numeric(as.factor(state))) %>% dplyr::select(everything(),target_death_rate)
-foreign::write.arff(x =  can_reg_arff, file = "can_reg_joinedv2.arff")
-```
 
 ```{r filter_spec_inc}
-#can_reg_joined
-# can_reg_lasso <- glmnet(x = as.matrix(can_reg[,c(1,2,4:8,11:12,14:17,19:21,23:24,26:34)]),y = can_reg$TARGET_deathRate, alpha = 1)
-#X <- as.matrix(dat_state[,-4])
 can_filt <- can_reg_joined %>% 
   janitor::clean_names() %>% 
     mutate(binned_inc = as.factor(binned_inc)) %>% 
   mutate(binned_inc = fct_reorder(.f = binned_inc,.x = med_income)) %>% 
-#  mutate()
 dplyr::select( -pop_est2015, -med_income, -avg_ann_count, -avg_deaths_per_year, -median_age, -median_age_male,        -pct_no_hs18_24, -pct_hs18_24, -pct_bach_deg18_24, -pct_some_col18_24,  -percent_married, -pct_employed16_over, -pct_private_coverage, -pct_private_coverage_alone, -pct_emp_priv_coverage, -pct_public_coverage, -pct_black, -pct_asian, -pct_other_race, -state_abb,  -county, -state, -geography, -binned_inc)
-
-#which(sapply(can_filt,is.character))
 ```
 
 ```{r ridge_regression}
 X = as.matrix(can_filt %>% dplyr::select(-target_death_rate) %>% sapply(as.numeric) %>% na.omit())
 Y = na.omit(can_filt)$target_death_rate
 set.seed(1)
-
 train<-sample(1:nrow(X),nrow(X)/2)
-
 test<-(-train)
-
 Y.test<-Y[test]
 set.seed(2)
 doParallel::registerDoParallel()
@@ -242,9 +191,6 @@ best.lambda<-cv.out$lambda.min
 ridge.pred <- predict(cv.out,s=best.lambda,newx=X[test,])
 mean((ridge.pred-Y.test)^2) #MSE
 final_ridge<-glmnet(X, Y, alpha=0, lambda=best.lambda)
-
-# res_ridge_ls<- cbind(coef(mult.fit),coef(ridge3))
-# colnames(res_ridge_ls) <- c("LS", "Ridge")
 res_ridge <- coef(final_ridge) 
 res_ridge %>% as.matrix() %>% as.data.frame() %>% add_rownames() %>% as.tibble() %>% 
   mutate(abs_ridge = abs(s0)) %>% 
@@ -252,21 +198,16 @@ res_ridge %>% as.matrix() %>% as.data.frame() %>% add_rownames() %>% as.tibble()
 final_ridge<-ridge3
 final_ridge$dev.ratio
 final_ridge_range<-glmnet(X, Y, alpha=0, lambda=grid)
-#plotmo::plot_glmnet(final_ridge_range,xvar = c())
-#can_reg_lasso$beta %>% View
+plotmo::plot_glmnet(final_ridge_range)
 ```
 
 Not surprisingly, the individual incidence rates tend to dominate the coefficients of the model. We'll try it out. Alternatively. We could use the top incidence rate per county as a factor and that may not overwhelm the model too much.  Besides these, the state region tends to be one of the largest predictors, as does the average household size and and the percent of married households. The dev ratio upon this run is `r final_ridge$dev.ratio`. It does include some incidence data, so this may be somewhat expected.
 
 ```{r glmnet_vif}
-
-#car::vif(lm(data=can_filt,target_death_rate ~ .))
-faraway::vif(lm(data=can_filt,target_death_rate ~ .)) %>% as.data.frame() %>% add_rownames() %>% as.tibble() %>% View()
-
+faraway::vif(lm(data=can_filt,target_death_rate ~ .)) %>% as.data.frame() %>% add_rownames() %>% as.tibble()
 ```
 ```{r data_exploration_with_ridge_model}
 can_filt %>% na.omit() %>% pull(state_region) %>% table()
-
 ```
 ```{r ridge_covtest}
 #runs elastic net and then a covTest on top.
@@ -274,57 +215,37 @@ ridge_cov_test <-covTest::covTest(lars.en(x=X,y=Y,lambda2=best.lambda),x=X,y=Y)
 colnames(X)[ridge_cov_test$results[ridge_cov_test$results[,3]<0.05,1]] #not sure how to interpret this, but herre are the significant factors. Best not to limit the paper to just these.
 ```
 
-```{r ridge_outliers}
-#not sure if we can even note this.
+```{r ridge_outliers_m_dist}
 faraway::vif(lm(data=can_filt,target_death_rate ~ .)) %>% as.data.frame() %>% add_rownames() %>% as.tibble() %>% View()
 #Mahanolobis distance.
-# m_dist <- mahalanobis(X, colMeans(X), cov(X))
-# XMD <- round(m_dist, 1)
-
-# Binary Outlier Variable
-# XMD$outlier <- "No"
-# XMD$outlier[XMD > 20] <- "Yes"    # Threshold set to 20
- mdist_outliers<- chemometrics::Moutlier(X)
-#which(mdist_outliers$rd>30)
+mdist_outliers<- chemometrics::Moutlier(X)
 outlier_counties <- can_reg_state[which(mdist_outliers$rd>30),c("state","county","pop_est2015")]
 outlier_counties %>% knitr::kable()
-
 ```
 ```{r linearity}
 GGally::ggpairs(can_filt)
-#pairs(can_filt)
 foreach(i = 2:ncol(can_filt)) %do%
 {plot(can_filt[["target_death_rate"]],can_filt %>% pull(i))
 }
 ```
 
 ```{r diagnotic_plots_ridge}
-
 plotmo::plot_glmnet(final_ridge_range,label = T,s = best.lambda, xvar = "rlambda")
 plotmo::plot_glmnet(final_ridge_range,label = T,s = best.lambda, xvar = "lambda")
 plotmo::plot_glmnet(final_ridge_range,label = T,s = best.lambda, xvar = "norm")
 plotmo::plot_glmnet(final_ridge_range,label = T,s = best.lambda, xvar = "dev")
 plotmo::plotres(final_ridge_range)
-
 ```
 
 
 ```{r}
 cancer_names <- list.files("can_inc") %>% gsub(x = ., pattern = ".csv", replacement = "")
-#X[which.max()]
-#colnames(X)[max.col(X[,cancer_names],ties.method="first")]
-# can_filt$top_can <- colnames(can_filt[,cancer_names])[apply(can_filt[,cancer_names],1,which.max) %>% unlist()]
 can_filt$top_can <- apply(can_filt[,cancer_names],1,which.max) %>% map(.x = ., .f = ~ifelse(length(.)==0,"none",cancer_names[.])) %>% unlist() %>% as.factor()
 X = as.matrix(can_filt %>% dplyr::select(-target_death_rate, -brca, -uterine, -bladder, -ovary, -brca_cis, -cervix, -colorectal, -lungbronc, -melanoma, -ovary, -prostate) %>% sapply(as.numeric) %>% na.omit())
-#Y = na.omit(can_filt)$target_death_rate
 Y = as.matrix(can_filt %>% dplyr::select( -bladder, -ovary, -brca_cis,  -brca, -uterine, -cervix, -colorectal, -lungbronc, -melanoma, -ovary, -prostate) %>% sapply(as.numeric) %>% na.omit() %>% .[,"target_death_rate"])
-
 set.seed(1)
-
 train<-sample(1:nrow(X),nrow(X)/2)
-
 test<-(-train)
-
 Y.test<-Y[test]
 set.seed(2)
 doParallel::registerDoParallel()
@@ -334,7 +255,6 @@ best.lambda<-cv.out$lambda.min
 ridge.pred <- predict(cv.out,s=best.lambda,newx=X[test,])
 mean((ridge.pred-Y.test)^2) #MSE
 ridge3<-glmnet(X, Y, alpha=0, lambda=best.lambda)
-#res_ridge_ls<- cbind(coef(mult.fit),coef(ridge3))
 res_ridge <- coef(ridge3) 
 res_ridge %>% as.matrix() %>% as.data.frame() %>% add_rownames() %>% as.tibble() %>% 
   mutate(abs_ridge = abs(s0)) %>% 
@@ -346,20 +266,14 @@ final_ridge_no_inc$dev.ratio
 As we take it out, we find that it gains a much lower importance in ridge regression. state_region tends to be the variable with the greatest importance, oddly. I would tend to include it in the final model, based on what we've seen here. Race, median age, and number of clinical trials tends to be several orders of magnitude below the education and employement variables... perhaps suggesting that the variance in Y may be better explained by direct employability measures like education and birth rate (which may be somewhat redundant with average household size). Dev ratio for this model, with a categorical variable for the most common cancer is `r final_ridge_no_inc$dev.ratio`, slightly below the adjusted R^2 of the full model after filtering.
 ```{r lasso_regression}
 X = as.matrix(can_filt %>% dplyr::select(-target_death_rate, -brca, -uterine, -bladder, -ovary, -brca_cis, -cervix, -colorectal, -lungbronc, -melanoma, -ovary, -prostate) %>% sapply(as.numeric) %>% na.omit())
-#Y = na.omit(can_filt)$target_death_rate
 Y = as.matrix(can_filt %>% dplyr::select( -bladder, -ovary, -brca_cis,  -brca, -uterine, -cervix, -colorectal, -lungbronc, -melanoma, -ovary, -prostate) %>% sapply(as.numeric) %>% na.omit() %>% .[,"target_death_rate"])
-
 set.seed(1)
-
 train<-sample(1:nrow(X),nrow(X)/2)
-
 test<-(-train)
-
 Y.test<-Y[test]
 set.seed(2)
 doParallel::registerDoParallel()
 grid <- 10^seq(5,-2, length=100)
-
 can_reg_lasso <- glmnet(x = X,y = Y, alpha = 1)
 lasso1<- glmnet(X[train ,],Y[train], alpha =1, lambda =grid)
 set.seed(2)
@@ -368,19 +282,15 @@ plot(cv.out)
 best.lambda<-cv.out$lambda.min
 lasso2<- glmnet(X, Y, alpha =1, lambda=best.lambda)
 coef(lasso2) %>% as.matrix() %>% as.data.frame() %>% add_rownames() %>% as.tibble() %>% mutate(abs_s0 = abs(s0)) %>% arrange(-abs_s0)
-#coef(mult.fit)
 final_lasso_no_inc <- lasso2
 plot(lasso1)
 final_lasso_no_inc$dev.ratio
-
 ```
 Utilizing lasso, we find that we have almost  precisely the same model. The dev ratio is nearly identical, at `r final_lasso_no_inc$dev.ratio`.
 
 With a dev ratio of `r final_lasso_no_inc$dev.ratio`, this might be a reasonable model... but there may be far better ones from standard linear regression. We'll compare using R^2.  We'll perform the same selection of inital variables as before, or we'll have a fair number of counties ending up with missing data.
 
 ```{r lm_comparison}
-#can_reg_state_copy <- can_reg_state
-#can_reg_state$
 can_reg_state$state.region[can_reg_state$county=="District of Columbia"]<-"South"
 can_reg_state_filtered <- can_reg_state %>% 
   janitor::clean_names() %>% 
@@ -391,7 +301,6 @@ can_reg_state_int_only <- lm(data = can_reg_state, target_death_rate ~ 0)
 full_lm_filtered <- lm(data = can_reg_state_filtered, target_death_rate ~ .)
 full_lm_filtered_int_only <- lm(data = can_reg_state_filtered, target_death_rate ~ 0)
 full_lm_filtered %>% summary()
-#Amelia::missmap(can_reg_state)
 plot(full_lm_filtered)
 full_lm_filtered_summary <- summary(full_lm_filtered)
 full_lm_filtered_summary$r.squared
@@ -405,36 +314,22 @@ We'll find that the lasso selected model only has a modest change (about 3%) to 
 both_model <- stats::step(full_lm_filtered_int_only,scope = list(
   lower=formula(full_lm_filtered_int_only), upper = formula(full_lm_filtered)
   ), direction='both')
-#which(is.na(can_reg_state$state.region))
 both_model$model
 both_model %>% summary()
 both_model %>% summary() %>% .$adj.r.squared
 ```
 Doing the both selection, we'll find there's a single missing value for state_region. It should be obvious how to correct this. It's the district of columbia. Considering the state above and below the district are both considered to be in the "South" level (2), we'll assign the same region to it. The adjusted R^2 is so high ($R^2$ =`r both_model %>% summary() %>% .$adj.r.squared`), we might suspect it's overfit.
-We'll also try an exhaustive method using criteria for Cp and adjusted R^2.
-```{r leaps, eval = F}
-#this crashes my R session. Moving on.
-# leaps::leaps(x = can_reg_state_filtered %>% dplyr::select(-target_death_rate) %>% as.data.frame(), y = can_reg_state_filtered %>% pull(target_death_rate), nbest = 2, method = "Cp")
-# leaps::leaps(x = can_reg_state_filtered %>% dplyr::select(-target_death_rate) %>% as.data.frame(), y = can_reg_state_filtered %>% pull(-target_death_rate), nbest = 2, method = "adjr2")
-
-```
 ```{r lasso_diags}
-#plotmo::plot_glmnet(final_lasso_no_inc, dev = "dev") #still having a couple issues with these. Feel free to try a different package if these don't work well.
-#plotmo::plot_glmnet(final_ridge_no_inc, xvar = "dev")
-#plot(final_ridge_no_inc, xvar = "lambda")
 par(mfrow = c(2,2))
 plot(full_lm_filtered)
 par(mfrow = c(2,2))
 plot(both_model)
 #https://web.stanford.edu/~hastie/glmnet/glmnet_alpha.html
-
 ```
 ```{r outliers}
 #from "both" model and full model
 outlier_counties <- can_reg_state[c(1221,1336,282,2714,1059),c("state","county","pop_est2015")]
 outlier_counties %>% knitr::kable()
-
-#can_reg_state[can_reg_state$MedianAge > 100,] #median age no longer exists.
 #no influence points.
 
 ```
@@ -449,14 +344,9 @@ full_lm_filtered
 ```
 
 ```{r PCA}
-
-#ade4::dudi.pca(df = as.matrix(sapply(can_reg_state_filtered,as.numeric)))
-#FactoMineR::PCA( as.matrix(sapply(can_reg_state_filtered,as.numeric)))
-# FactoMineR::PCA( can_reg_state_filtered %>% mutate(state_region = as.numeric(state_region)) %>% mutate(binned_inc = as.numeric(binned_inc)))
 pca_can_reg_state_filtered <- stats::princomp(can_reg_state_filtered %>% mutate(state_region = as.numeric(state_region)) %>% mutate(binned_inc = as.numeric(as.factor(binned_inc))) %>% na.omit())
 plot(pca_can_reg_state_filtered)
 pca_can_reg_state_filtered$loadings
-#pca_can_reg_state_filtered$scores
 ```
 If we look at the amount of variance explained by PC1 and look at the loadings, we'll find relationships among the variables. Among them, female and age male age tend to put their variance into the same bins utilizing the same variables. Incidence and the target variable go together,                                                                                                                                                                                                                                                                                                                                                                                                        
 ```{r extra_pca, eval = F, echo = F}
@@ -478,63 +368,26 @@ faraway::vif(full_lm_filtered)
           can_reg_state_filtered_vif_reduced %>% faraway::vif() %>% sort(decreasing = T)
 ```
 By removing the the median male age and the percent of individuals over 25 with only a high school education, we find that our VIF values are below 5. As we add in further variables, we'll have to watch this and make sure it stays below this level. It's a reasonable model with an $R^2_{adj}$ = `r can_reg_state_filtered_vif_reduced %>% summary() %>% .$adj.r.squared`.
-```{r partialr2}
-#plot(anova(full_lm_filtered), 'partial R2')
-```
-
-```{r  elastic_net}
-
-# res_ls_ridge_lasso<- cbind(coef(mult.fit),coef(ridge3),coef(lasso2))
-# colnames(res_ls_ridge_lasso) <- c("LS", "Ridge","Lasso")
-# res_ls_ridge_lasso
-
-```
-
-```{r assumptions}
-#use covTest to get predictions
-#get residuals
-```
-
-
-```{r}
-# can_reg_state <-
-# can_reg_state %>% 
-#   janitor::clean_names()
-# can_reg_state_filtered <- can_reg_state %>% 
-#   janitor::clean_names() %>% 
-# dplyr::select( -pop_est2015, -med_income, -avg_ann_count, -avg_deaths_per_year, -median_age,        -pct_no_hs18_24, -pct_hs18_24, -pct_bach_deg18_24, -pct_some_col18_24,   -percent_married, -pct_employed16_over, -pct_private_coverage, -pct_private_coverage_alone, -pct_emp_priv_coverage, -pct_public_coverage, -pct_black, -pct_asian, -pct_other_race, -state_abb,  -county, -state, -geography)
-
-```
 
 Given all the previous information, we'll attempt to combine the models now. Most of the variables are correlated with the predictor and according to lecture 21, slide  14, ridge should do better in this case. 
 
-```{r write_arff2}
-can_reg_arff <- can_reg_joined %>% mutate(binned_inc = as.numeric(as.factor(binned_inc))) %>% dplyr::select(-county,-geography, -state_abb) %>% mutate(state = as.numeric(as.factor(state))) %>% dplyr::select(everything(),target_death_rate)
-foreign::write.arff(x =  can_reg_arff, file = "can_reg_joinedv2.arff")
-```
 
 ```{r filter_spec_inc}
-#X <- as.matrix(dat_state[,-4])
 can_filt2 <- can_reg_joined %>% 
   janitor::clean_names() %>% 
     mutate(binned_inc = as.factor(binned_inc)) %>% 
   mutate(binned_inc = fct_reorder(.f = binned_inc,.x = med_income)) %>% 
-#  mutate()
 dplyr::select( -pop_est2015, -med_income, -binned_inc, -avg_ann_count, -avg_deaths_per_year, -median_age,    -pct_hs25_over, -median_age_male,    -pct_no_hs18_24, -pct_hs18_24, -pct_bach_deg18_24, -pct_some_col18_24,  -percent_married, -pct_employed16_over, -pct_private_coverage, -pct_private_coverage_alone, -pct_emp_priv_coverage, -pct_public_coverage, -pct_black, -pct_asian, -pct_other_race, -state_abb,  -county, -state, -geography)
 can_filt2$top_can <- apply(can_filt2[,cancer_names],1,which.max) %>% map(.x = ., .f = ~ifelse(length(.)==0,"none",cancer_names[.])) %>% unlist() %>% as.factor()
 can_filt2 <- can_filt2 %>% dplyr::select(-cancer_names)
-#which(sapply(can_filt,is.character))
 ```
 
 ```{r lasso_with_redundant_removed}
 X = as.matrix(can_filt2 %>% dplyr::select(-target_death_rate) %>% sapply(as.numeric) %>% na.omit())
 Y = na.omit(can_filt2)$target_death_rate
 set.seed(1)
-
 train<-sample(1:nrow(X),nrow(X)/2)
-
 test<-(-train)
-
 Y.test<-Y[test]
 set.seed(2)
 doParallel::registerDoParallel()
@@ -544,32 +397,12 @@ best.lambda<-cv.out$lambda.min
 lasso.pred <- predict(cv.out,s=best.lambda,newx=X[test,])
 mean((lasso.pred-Y.test)^2) #MSE
 lasso3<-glmnet(X, Y, alpha=1, lambda=best.lambda)
-# res_lasso_ls<- cbind(coef(mult.fit),coef(lasso3))
-# colnames(res_lasso_ls) <- c("LS", "lasso")
 res_lasso <- coef(lasso3) 
 res_lasso %>% as.matrix() %>% as.data.frame() %>% add_rownames() %>% as.tibble() %>% 
   mutate(abs_lasso = abs(s0)) %>% 
   arrange(-abs_lasso) %>% knitr::kable()
 final_lasso_with_inc_reduced<-lasso3
 final_lasso_with_inc_reduced$dev.ratio
-```
-With the inflated variables removed and a new dev ratio of 
-```{r caret_cv}
-# data_train<-trainControl(method="cv", number=10)
-# model_caret<-train(X, Y,
-#   #                 data=can_filt2,
-#                    trControl=data_train,
-#                    method='glmnet',
-# #                   metric = "ROC",
-#                    na.action=na.pass)
-```
-```{r}
-#incidence rate by region 
-#summary table for every variable.
-# can_filt %>% 
-#   group_by_all(state_region, mean)  
-  
-
 ```
 ```{r}
 can_filt3 <- can_reg_joined %>% 
@@ -578,21 +411,8 @@ can_filt3 <- can_reg_joined %>%
   mutate(binned_inc = fct_reorder(.f = binned_inc,.x = med_income)) 
 #add_top_can
 can_filt3$top_can <- apply(can_filt[,cancer_names],1,which.max) %>% map(.x = ., .f = ~ifelse(length(.)==0,"none",cancer_names[.])) %>% unlist() %>% as.factor()
-#apply(can_filt[,cancer_names],1,which.max) %>% unlist() %>% table() %>% names(.) %>% as.numeric() %>% cancer_names[.]
 can_filt3 <- can_filt3 %>% 
-  #transmute(avg_household_size = log(avg_household_size)) %>% 
-#  mutate()
-#  .[c(-1009,-2221,-2090,-1008,-2087,-2218, -1007,-1006,-1005,-1004,-1003,-1002),] %>% 
 dplyr::select( -pop_est2015, -med_income, -avg_ann_count, -avg_deaths_per_year, -median_age, -median_age_male,        -pct_no_hs18_24, -pct_hs18_24, -pct_bach_deg18_24, -pct_some_col18_24,  -percent_married, -pct_employed16_over, -pct_private_coverage, -pct_private_coverage_alone, -pct_emp_priv_coverage, -pct_public_coverage, -pct_black, -pct_asian, -pct_other_race, -state_abb,  -county, -state, -geography,  -binned_inc, -uterine, -bladder, -ovary, -brca_cis, -cervix, -colorectal, -melanoma, -ovary, -prostate, -brca) #%>% 
-#   mutate(pct_unemployed16_over = (pct_unemployed16_over)^.5,
-#          poverty_percent = log(poverty_percent + 1e-2),
-# #         study_per_cap = (study_per_cap)^(-1/15),
-#          birth_rate = (birth_rate)^.5,
-#          incidence_rate = log(incidence_rate + 1e-2),
-#          lungbronc = log(lungbronc + 1e-2),
-#          avg_household_size = (avg_household_size)^2,
-#          pct_white = (pct_white)^3,
-#          pct_bach_deg25_over = (pct_bach_deg25_over)^.5)
 
 ```
 ```{r transformations, eval = F}
@@ -601,42 +421,24 @@ colnames(skew_table) <- c("variable","skewness")
 skew_table %>% 
   mutate(abs_skew = abs(skewness)) %>% 
   arrange(-abs_skew)
-#which(sapply(can_filt3, is.numeric))
-#boxcox_plots<-foreach(i=which(sapply(can_filt3, is.numeric))) %do%
-#{lm(data= can_filt3, as.formula(paste0("target_death_rate ~ ",paste0(names(can_filt3)[i])))) %>% MASS::boxcox(ylab=names(can_filt3)[i])}
-#hist(log(can_filt3$study_per_cap+0.01))
-#hist(can_filt3$pct_white^(1/10))
 dotplot.mtb(can_filt3$study_per_cap %>% rank)
 MASS::boxcox(lm(data=can_filt3, target_death_rate ~ atan(pct_white)))
-#GGally::ggpairs(can_filt3)
 ```
 
 ```{r lasso_with_redundant_removed}
-#saveRDS(can_reg_joined,"can_reg_joined.rds")
 can_filt3 <- can_reg_joined %>% 
   janitor::clean_names() %>% 
     mutate(binned_inc = as.factor(binned_inc)) %>% 
   mutate(binned_inc = fct_reorder(.f = binned_inc,.x = med_income)) 
-#add_top_can
 can_filt3$top_can <- apply(can_filt[,cancer_names],1,which.max) %>% map(.x = ., .f = ~ifelse(length(.)==0,"none",cancer_names[.])) %>% unlist() %>% as.factor()
-#apply(can_filt[,cancer_names],1,which.max) %>% unlist() %>% table() %>% names(.) %>% as.numeric() %>% cancer_names[.]
 can_filt3 <- can_filt3 %>% 
-  #transmute(avg_household_size = log(avg_household_size)) %>% 
-#  mutate()
-#  .[c(-1009,-2221,-2090,-1008,-2087,-2218, -1007,-1006,-1005,-1004,-1003, -1002),] %>% 
 dplyr::select( -pop_est2015, -med_income, -avg_ann_count, -avg_deaths_per_year, -median_age, -median_age_male,        -pct_no_hs18_24, -pct_hs18_24, -pct_bach_deg18_24, -pct_some_col18_24,  -percent_married, -pct_employed16_over, -pct_private_coverage, -pct_private_coverage_alone, -pct_emp_priv_coverage, -pct_public_coverage, -pct_black, -pct_asian, -pct_other_race, -state_abb,  -county, -state, -geography,  -binned_inc, -uterine, -bladder, -ovary, -brca_cis, -cervix, -colorectal, -melanoma, -ovary, -prostate, -brca) %>%
-  #mutate(study_per_cap = study_per_cap^(-1)) %>% 
-  #na.omit()
   mutate(study_per_cap = atan(study_per_cap))
-
 X = as.matrix(can_filt3 %>% dplyr::select(-target_death_rate) %>% sapply(as.numeric) %>% na.omit())
 Y = na.omit(can_filt3)$target_death_rate
 set.seed(1)
-
 train<-sample(1:nrow(X),nrow(X)/2)
-
 test<-(-train)
-
 Y.test<-Y[test]
 set.seed(2)
 doParallel::registerDoParallel()
@@ -646,9 +448,6 @@ best.lambda<-cv.out$lambda.min
 lasso.pred <- predict(cv.out,s=best.lambda,newx=X[test,])
 final_lasso_with_inc_reduced_single_can_MSE <-mean((lasso.pred-Y.test)^2) #MSE
 lasso3<-glmnet(X, Y, alpha=1, lambda=best.lambda)
-
-# res_lasso_ls<- cbind(coef(mult.fit),coef(lasso3))
-# colnames(res_lasso_ls) <- c("LS", "lasso")
 res_lasso <- coef(lasso3) 
 res_lasso %>% as.matrix() %>% as.data.frame() %>% add_rownames() %>% as.tibble() %>% 
   mutate(abs_lasso = abs(s0)) %>% 
@@ -667,20 +466,14 @@ Amelia::missmap(can_filt3)
 ```
 
 ```{r averages_by_region}
-#which region has the highest BRCA incidence?
 can_filt3 %>% 
   na.omit() %>% 
   group_by(state_region) %>% 
-  # summarize(mean_brca = mean(brca),
-  #           mean_pct_public_coverage_alone = mean(pct_public_coverage_alone))
   summarise_all("mean") %>% 
   gather(variable,region_mean, -state_region) %>% 
   ggplot(aes(y=variable,x=region_mean, color=state_region)) +
   geom_point() + theme(axis.text.x = element_text(angle = 90, hjust = 1))
-  # skimr::skim() %>% 
-  # arrange(variable, region)
 #does brca play a bigger role there?
-#log transform everything that needs it.
 ```
 
 ```{r}
@@ -689,23 +482,14 @@ can_filt3 %>%
   mutate(value = as.numeric(as.character(value))) %>% 
   group_by(variable) %>% 
   summarize(transformed_value = heatmaply::percentize(value)) %>% 
-#  filter(variable != "study_per_cap") %>% 
      na.omit() %>% 
-  # group_by(state_region) %>% 
-  # summarize(mean_brca = mean(brca),
-  #           mean_pct_public_coverage_alone = mean(pct_public_coverage_alone))
   ggplot(aes(x=variable, y = value ,  color = state_region)) + #group=state_region
   geom_boxplot() + theme(axis.text.x = element_text(angle = 90, hjust = 1))
-
-  # summarise_all("mean") %>% f
-  # gather(variable,region_mean, -state_region) %>% 
-  # ggplot(aes(y=variable,x=region_mean, color=state_region)) +
-  # geom_point() + theme(axis.text.x = element_text(angle = 90, hjust = 1))
 can_reg_state %>%
   janitor::clean_names() %>% 
   dplyr::select(state,county,incidence_rate, everything()) %>% 
   dplyr::arrange(-incidence_rate)
-#cancers in the south tend to
+#cancers in the south tend to have higher incidence rates than the west.
 ```
 
 ```{r}
@@ -714,34 +498,17 @@ can_filt3 %>%
   gather(variable,value,-high_poverty) %>% 
   mutate(value = as.numeric(as.character(value))) %>% 
   mutate(value = heatmaply::percentize(value)) %>% 
-
-#  filter(variable != "study_per_cap") %>% 
      na.omit() %>% 
-  # group_by(state_region) %>% 
-  # summarize(mean_brca = mean(brca),
-  #           mean_pct_public_coverage_alone = mean(pct_public_coverage_alone))
   ggplot(aes(x=variable, y = value ,  color = high_poverty)) + #group=state_region
   geom_boxplot() + theme(axis.text.x = element_text(angle = 90, hjust = 1))
-
 can_filt3 %>% 
   mutate(racial_diversity = pct_white < can_filt$poverty_percent %>% summary() %>% .["1st Qu."]) %>% 
   gather(variable,value,-racial_diversity) %>% 
   mutate(value = as.numeric(as.character(value))) %>% 
   mutate(value = heatmaply::percentize(value)) %>% 
-
-#  filter(variable != "study_per_cap") %>% 
      na.omit() %>% 
-  # group_by(state_region) %>% 
-  # summarize(mean_brca = mean(brca),
-  #           mean_pct_public_coverage_alone = mean(pct_public_coverage_alone))
   ggplot(aes(x=variable, y = value ,  color = racial_diversity)) + #group=state_region
   geom_boxplot() + theme(axis.text.x = element_text(angle = 90, hjust = 1))
 
 ```
 
-color ternary plot-- 4 variables, 5 with a shape.
-https://rdrr.io/cran/ggtern/
-poverty, educaction, etc. many variables tend to go together, especially with lung cancer.
-smoking problably is a good way to go as well.
-access to treatments.
-percent public coverage alone-- show it's relationship to death rate and incidence ratemo

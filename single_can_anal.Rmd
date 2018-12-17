@@ -30,16 +30,8 @@ can_filt3 <- can_reg_joined %>%
   mutate(binned_inc = fct_reorder(.f = binned_inc,.x = med_income)) 
 #add_top_can
 can_filt3$top_can <- apply(can_filt3[,cancer_names],1,which.max) %>% map(.x = ., .f = ~ifelse(length(.)==0,"none",cancer_names[.])) %>% unlist() %>% as.factor()
-#apply(can_filt[,cancer_names],1,which.max) %>% unlist() %>% table() %>% names(.) %>% as.numeric() %>% cancer_names[.]
 can_filt3 <- can_filt3 %>% 
-  #transmute(avg_household_size = log(avg_household_size)) %>% 
-#  mutate()
-#  .[c(-1009,-2221,-2090,-1008,-2087,-2218, -1007,-1006,-1005,-1004,-1003, -1002),] %>% 
-dplyr::select( -pop_est2015, -med_income, -avg_ann_count, -avg_deaths_per_year, -median_age, -median_age_male,        -pct_no_hs18_24, -pct_hs18_24, -pct_bach_deg18_24, -pct_some_col18_24,  -percent_married, -pct_employed16_over, -pct_private_coverage, -pct_private_coverage_alone, -pct_emp_priv_coverage, -pct_public_coverage, -pct_black, -pct_asian, -pct_other_race, -state_abb,  -county, -state, -geography,  -binned_inc, -uterine, -bladder, -ovary, -brca_cis, -cervix, -colorectal, -melanoma, -ovary, -prostate, -brca, -study_per_cap) #%>%
-  #mutate(study_per_cap = study_per_cap^(-1)) %>% 
-  #na.omit()
-#  mutate(study_per_cap = atan(study_per_cap))
-
+dplyr::select( -pop_est2015, -med_income, -avg_ann_count, -avg_deaths_per_year, -median_age, -median_age_male,        -pct_no_hs18_24, -pct_hs18_24, -pct_bach_deg18_24, -pct_some_col18_24,  -percent_married, -pct_employed16_over, -pct_private_coverage, -pct_private_coverage_alone, -pct_emp_priv_coverage, -pct_public_coverage, -pct_black, -pct_asian, -pct_other_race, -state_abb,  -county, -state, -geography,  -binned_inc, -uterine, -bladder, -ovary, -brca_cis, -cervix, -colorectal, -melanoma, -ovary, -prostate, -brca, -study_per_cap) 
 X = as.matrix(can_filt3 %>% dplyr::select(-target_death_rate) %>% sapply(as.numeric) %>% na.omit())
 Y = na.omit(can_filt3)$target_death_rate
 set.seed(1)
@@ -78,7 +70,6 @@ We have now created another model with dev ratio of `r final_lasso_with_inc_redu
 lar_full<-selectiveInference::lar(x = X,y = Y)
 spacing_test<-selectiveInference::larInf(lar_full) #this is a better test that actually gives inference of the individual predictor's correlation.
 spacing_test$predictor <- colnames(X)[spacing_test$var]
-#class(spacing_test_table)<-"list"
 ci_tibble <- spacing_test$ci %>% as.tibble()
 colnames(ci_tibble)<-c("upper_CI","LowerCI")
 covtest_spacing_pval <- tibble(predictor = colnames(X)[spacing_test$vars],spacing.p.value = spacing_test$pv.spacing, covtest.pval = spacing_test$pv.covtest) %>%
@@ -88,16 +79,12 @@ covtest_spacing_pval <- tibble(predictor = colnames(X)[spacing_test$vars],spacin
   mutate(significance_adj = ifelse(adj.spacing.pvalue < 0.05, "*","")) %>%
   select(covtest.pval,spacing.p.value,significance,adj.spacing.pvalue,significance_adj,everything()) %>% 
   dplyr::arrange(spacing.p.value)
-#nrow(X)
-#spacing_test_table %>% coef.lar()
-#length(Y)
 covtest_spacing_pval %>% knitr::kable()
-#covtest_spacing_pval %>% View
 ```
 Using a test suggested by Tshibirani in his text, (statistical learning with sparsity, the lasso and its generalizations, p.161), we find that the lung-bronchial cancer incidence rate, the raw incidence rate for all cancers, and both college education and high school education status have a nonzero coefficient in the least angle regression model. The text suggests that this test is superior to the covariance test in that the entire model is not tested at each knot, but rather "whether the partial correlation of the given predictor entered in that step [knot] is zero, adjusting for other variables currently in the model" (p.161). As such, it does not simply test for the lasso path, but for the individual contribution of each predictor to the model. As we might gather, this agrees completely with the covariance test results and with the confidence intervals that do not contain zero in the least angle regression estimate confidence interval. It is often said that p-values are not sharp cutoffs and the adjustment procedure here has been very conservative. 
 ```{r missing}
 #there is some missing data, but only in the brca incidence.
-Amelia::missmap(can_filt3)
+#Amelia::missmap(can_filt3)
 ```
 
 ```{r averages_by_region}
@@ -105,16 +92,10 @@ Amelia::missmap(can_filt3)
 can_filt3 %>% 
   na.omit() %>% 
   group_by(state_region) %>% 
-  # summarize(mean_brca = mean(brca),
-  #           mean_pct_public_coverage_alone = mean(pct_public_coverage_alone))
   summarise_all("mean") %>% 
   gather(variable,region_mean, -state_region) %>% 
   ggplot(aes(y=variable,x=region_mean, color=state_region)) +
   geom_point() + theme(axis.text.x = element_text(angle = 90, hjust = 1))
-  # skimr::skim() %>% 
-  # arrange(variable, region)
-#does brca play a bigger role there?
-#log transform everything that needs it.
 ```
 
 ```{r}
@@ -122,39 +103,22 @@ can_filt3 %>%
   gather(variable,value,-state_region) %>% 
   mutate(value = as.numeric(as.character(value))) %>% 
   mutate(value = heatmaply::percentize(value)) %>% 
-  # group_by(variable) %>% 
-  # summarize(transformed_value = heatmaply::percentize(value)) %>% 
-#  filter(variable != "study_per_cap") %>% 
      na.omit() %>% 
-  # group_by(state_region) %>% 
-  # summarize(mean_brca = mean(brca),
-  #           mean_pct_public_coverage_alone = mean(pct_public_coverage_alone))
-  ggplot(aes(x=variable, y = value ,  color = state_region)) + #group=state_region
+  ggplot(aes(x=variable, y = value ,  color = state_region)) + 
   geom_boxplot() + theme(axis.text.x = element_text(angle = 90, hjust = 1))
-
-  # summarise_all("mean") %>% f
-  # gather(variable,region_mean, -state_region) %>% 
-  # ggplot(aes(y=variable,x=region_mean, color=state_region)) +
-  # geom_point() + theme(axis.text.x = element_text(angle = 90, hjust = 1))
 can_reg_state %>%
   janitor::clean_names() %>% 
   dplyr::select(state,county,incidence_rate, everything()) %>% 
   dplyr::arrange(-incidence_rate)
-#cancers in the south tend to
 ```
-
+The counties with the highest incidence rate are displayed above, as we'll see, Union county turns out to be an outlier that will be visible in diagnostic plots, but is a feature of the data and given income and poverty rates, makes sense with our model.
 ```{r}
 can_filt3 %>% 
   mutate(high_poverty = poverty_percent > can_filt3$poverty_percent %>% summary() %>% .["3rd Qu."]) %>% 
   gather(variable,value,-high_poverty) %>% 
   mutate(value = as.numeric(as.character(value))) %>% 
   mutate(value = heatmaply::percentize(value)) %>% 
-
-#  filter(variable != "study_per_cap") %>% 
      na.omit() %>% 
-  # group_by(state_region) %>% 
-  # summarize(mean_brca = mean(brca),
-  #           mean_pct_public_coverage_alone = mean(pct_public_coverage_alone))
   ggplot(aes(x=variable, y = value ,  color = high_poverty)) + #group=state_region
   geom_boxplot() + theme(axis.text.x = element_text(angle = 90, hjust = 1))
 ```
@@ -164,23 +128,12 @@ can_filt3 %>%
   gather(variable,value,-racial_diversity) %>% 
   mutate(value = as.numeric(as.character(value))) %>% 
   mutate(value = heatmaply::percentize(value)) %>% 
-
-#  filter(variable != "study_per_cap") %>% 
      na.omit() %>% 
-  # group_by(state_region) %>% 
-  # summarize(mean_brca = mean(brca),
-  #           mean_pct_public_coverage_alone = mean(pct_public_coverage_alone))
   ggplot(aes(x=variable, y = value ,  color = racial_diversity)) + #group=state_region
   geom_boxplot() + theme(axis.text.x = element_text(angle = 90, hjust = 1))
 
 ```
 
-color ternary plot-- 4 variables, 5 with a shape.
-https://rdrr.io/cran/ggtern/
-poverty, educaction, etc. many variables tend to go together, especially with lung cancer.
-smoking problably is a good way to go as well.
-access to treatments.
-percent public coverage alone-- show it's relationship to death rate and incidence rate
 ```{r ternary, figure.width = 10 , figure.height = 10}
 #could do a ternary for each region (facet)
 #https://rpubs.com/KDVdecisions/triadtutorial1
@@ -195,18 +148,19 @@ ggtern_plot <-  ggtern::ggtern(data=na.omit(can_filt3), mapping= aes(x=fmsb::per
   guides(fill = "none", alpha = "none") +
   labs (x = "Poverty", y = "Death Rate", z = "% Bachelor's Degree", color = "% Public Insurance Coverage Alone") +  theme(legend.position = "bottom") + Tlab(label = "", labelarrow = "Death Rate") + Llab(label = "", labelarrow = "Poverty") + Rlab(label = "", labelarrow = "% witout Bach")
 ggtern_plot
-#par(mfrow)
+
 # can_filt3[can_filt3$state_region=="South",c("poverty_percent","target_death_rate","pct_bach_deg25_over")] %>% transmute(poverty_percent = poverty_percent, target_death_rate, pct_without_deg = 100-pct_bach_deg25_over) %>% cor(use = "pairwise.complete.obs", method="kendall") %>%  corrplot(order="hclust", method = "number")
 # can_filt3[can_filt3$state_region=="South",c("poverty_percent","target_death_rate","pct_bach_deg25_over")] %>% cor(use = "pairwise.complete.obs", method="kendall") %>%  corrplot(order="hclust", method = "number")
 # can_filt3[can_filt3$state_region=="Northeast",c("poverty_percent","target_death_rate","pct_bach_deg25_over")] %>% cor(use = "pairwise.complete.obs", method="kendall") %>%  corrplot(order="hclust", method = "number")
 # can_filt3[can_filt3$state_region=="North Central",c("poverty_percent","target_death_rate","pct_bach_deg25_over")] %>% cor(use = "pairwise.complete.obs", method="kendall") %>%  corrplot(order="hclust", method = "number")
 # can_filt3[can_filt3$state_region=="West",c("poverty_percent","target_death_rate","pct_bach_deg25_over")] %>% cor(use = "pairwise.complete.obs", method="kendall") %>%  corrplot(order="hclust", method = "number")
+par(mfrow=c(2,2))
 foreach::foreach(reg=levels(can_filt3$state_region)) %do%
 {
   can_filt3[can_filt3$state_region==reg,c("poverty_percent","target_death_rate","pct_bach_deg25_over","pct_public_coverage_alone")] %>% transmute(poverty_percent = poverty_percent, target_death_rate,pct_public_coverage_alone = pct_public_coverage_alone, pct_without_deg = 100-pct_bach_deg25_over) %>% cor(use = "pairwise.complete.obs", method="pearson") %>%  corrplot( method = "number", title=paste0(reg,"region"))
 }
 ```
-
+Percent public coverage alone, relationship to death rate and incidence rate:
 It's compelling that the relationship between poverty and death rate is strongest in certain regions, namely in the west. A more indepth view of states within the west state areas this may provide additional insight.  We'll add back in the state and county data to see which states/counties may be responsible for the incredibly weak link between poverty and death rate in the west. Ternary plots are uncommon, but a powerful way to display complex relationships of three independent variables (http://science.sciencemag.org/content/sci/215/4537/1191.full.pdf).
 Figure 4. Ternary plot suggests that the 3-way relationship between education, poverty, insurance coverage differs as the polygon placement and  shape differs, suggesting that numerical relationships between these three variabes is not equally strong in all pairwise relationships. Notably, we also find a large central peak in the south plot that shows that each of all three variables are related to each other (percentages of poverty, of indiviudals without a bachelor's degree, and percentile death rate). The high amount brightly colored points suggests counties with a high percentage of indiviudals with only public coverage. In short, all of the variables are related well in the  south, but not so in the west (which contains lower income areas that are highly educated and with the lowest cancer areas in the country).
 
@@ -217,11 +171,7 @@ can_filt4 <- can_reg_joined %>%
     mutate(binned_inc = as.factor(binned_inc)) %>% 
   mutate(binned_inc = fct_reorder(.f = binned_inc,.x = med_income)) 
 can_filt4$top_can <- apply(can_filt4[,cancer_names],1,which.max) %>% map(.x = ., .f = ~ifelse(length(.)==0,"none",cancer_names[.])) %>% unlist() %>% as.factor()
-#apply(can_filt[,cancer_names],1,which.max) %>% unlist() %>% table() %>% names(.) %>% as.numeric() %>% cancer_names[.]
 can_filt4 <- can_filt4 %>% 
-  #transmute(avg_household_size = log(avg_household_size)) %>% 
-#  mutate()
-#  .[c(-1009,-2221,-2090,-1008,-2087,-2218, -1007,-1006,-1005,-1004,-1003, -1002),] %>% 
 dplyr::select( -pop_est2015,  -avg_ann_count, -avg_deaths_per_year, -median_age, -median_age_male,        -pct_no_hs18_24, -pct_hs18_24, -pct_bach_deg18_24, -pct_some_col18_24,  -percent_married, -pct_employed16_over, -pct_private_coverage, -pct_private_coverage_alone, -pct_emp_priv_coverage, -pct_public_coverage, -pct_black, -pct_asian, -pct_other_race, -state_abb,   -geography,  -binned_inc, -uterine, -bladder, -ovary, -brca_cis, -cervix, -colorectal, -melanoma, -ovary, -prostate, -brca, -study_per_cap)
 
 ```
@@ -321,9 +271,6 @@ lm(data=can_reg_joined, target_death_rate ~ study_per_cap*state) %>% broom::tidy
 ```
 
 ```{r}
-#hit florida
-#dichotonmize clinical trials
-#2 stage lasso to boost dev ratio (cite book and 2007 paper).
 can_reg_state[1000:1010,]
 can_filt_florida <- can_reg_joined %>% 
   filter(state == "Florida") %>% 
@@ -331,11 +278,7 @@ can_filt_florida <- can_reg_joined %>%
     mutate(binned_inc = as.factor(binned_inc)) %>% 
   mutate(binned_inc = fct_reorder(.f = binned_inc,.x = med_income)) 
 can_filt_florida$top_can <- apply(can_filt_florida[,cancer_names],1,which.max) %>% map(.x = ., .f = ~ifelse(length(.)==0,"none",cancer_names[.])) %>% unlist() %>% as.factor()
-#apply(can_filt[,cancer_names],1,which.max) %>% unlist() %>% table() %>% names(.) %>% as.numeric() %>% cancer_names[.]
 can_filt_florida <- can_filt_florida %>% 
-  #transmute(avg_household_size = log(avg_household_size)) %>% 
-#  mutate()
-#  .[c(-1009,-2221,-2090,-1008,-2087,-2218, -1007,-1006,-1005,-1004,-1003, -1002),] %>% 
 dplyr::select( -pop_est2015,  -avg_ann_count, -avg_deaths_per_year, -median_age, -median_age_male,        -pct_no_hs18_24, -pct_hs18_24, -pct_bach_deg18_24, -pct_some_col18_24,  -percent_married, -pct_employed16_over, -pct_private_coverage, -pct_private_coverage_alone, -pct_emp_priv_coverage, -pct_public_coverage, -pct_black, -pct_asian, -pct_other_race, -state_abb,   -geography,  -binned_inc, -uterine, -bladder, -ovary, -brca_cis, -cervix, -colorectal, -melanoma, -ovary, -prostate, -brca, -study_per_cap)
 
 ```
@@ -387,9 +330,6 @@ can_filt_florida %>%
 
 ```
 
-```{r}
-
-```
 
 Education seems to play a role in many sections of this data and it seems to be where the strongest signatures come from. Behavioral data should be added along with smoking rates. The BRFSS data is not subsampled, but just contains sparse responses. However, it is a currently used resource in literature precisely for this topic (https://pophealthmetrics.biomedcentral.com/articles/10.1186/1478-7954-12-5).
 ```{r eval=F} 
